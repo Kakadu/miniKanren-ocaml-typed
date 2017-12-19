@@ -324,7 +324,7 @@ module Var =
       let scope = ref 0 in
       fun () -> (incr scope; !scope)
 
-    let global_anchor = [7]
+    let global_anchor = [-8]
     let register_global_anchor () =
       Callback.register "global_anchor" global_anchor
 
@@ -705,6 +705,7 @@ module Subst :
     val is_subsumed : Env.t -> t -> t -> bool
 
     val register_externs : unit -> unit
+
     val print: t -> (Obj.t -> string) -> unit
     val size: t -> int
   end =
@@ -885,7 +886,6 @@ module Subst :
 
           rez
       | None -> None
-
 
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
         | Some s  -> begin
@@ -1997,6 +1997,7 @@ let pretty_generic_show ?(maxdepth= 99999) is_var x =
   Buffer.contents b
 
 let logged_unif_counter = ref 0
+
 let unitrace shower x y : goal = fun st ->
   incr logged_unif_counter;
 
@@ -2014,7 +2015,6 @@ let unitrace shower x y : goal = fun st ->
     match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
   in
   ans
-
 
 external unify_preload_stuff: unit -> unit = "caml_unify_preload_stuff"
 

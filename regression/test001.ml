@@ -49,21 +49,6 @@ let show_int_list  = (show(List.ground) (show int))
 let show_intl_list = (show(List.logic ) (show(logic) (show int)))
 let runL n         = runR (List.reify MiniKanren.reify) show_int_list show_intl_list n
 
-(* let rec appendo a b ab =
- *   let (===) x y = unitrace (fun h x -> show_intl_list @@ List.reify MiniKanren.reify h x) x y in
- *   conde
- *     [ ((a === nil ()) &&& (b === ab))
- *     ; fresh (h t ab')
- *         (a === h%t)
- *         (h%ab' === ab)
- *         (appendo t b ab')
- *     ] *)
-
-(* let _ =
- *   run_exn show_int  1  q qh (REPR (fun q   ->
- *       let (===) x y = unitrace (fun h x -> show_intl @@ MiniKanren.reify h x) x y in
- *       (q === !!1) &&& (q === (!!1))   )) *)
-
 let _ =
   run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
