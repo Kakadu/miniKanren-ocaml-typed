@@ -11,7 +11,7 @@ module GTyp =
     module T =
       struct
         @type ('a, 'b) t =
-	| P   of 'a      (* primitive *)
+        | P   of 'a      (* primitive *)
         | Arr of 'b * 'b (* arrow *)
         with gmap, show
 
@@ -72,6 +72,8 @@ let inj_list_p xs = List.list @@ List.map (fun (x,y) -> pair x y) xs
 
 (* Without free variables *)
 let () =
+  (* run_exn (fun s -> s)    1 q qh (REPR (fun q -> (!!"1" === !!"1") &&& (q === !!"2") )); *)
+
   run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [])  q                                   ));
   run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varX, v varX)]) q                    ));
   run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varY, v varY); (varX, v varX)]) q    ));
@@ -79,7 +81,8 @@ let () =
   run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varX)  ));
   run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varY)  ));
 
-  run_exn GTyp.show_rtyp    1 q qh (REPR (fun q -> infero (abs varX (app (v varX) (v varX)))                q))
+  run_exn GTyp.show_rtyp    1 q qh (REPR (fun q -> infero (abs varX (app (v varX) (v varX)))                q));
+  ()
 
 let show_env_logic = show(List.logic) @@ show(logic) (show(GT.pair) (show(logic) (fun s -> s)) show_llam)
 

@@ -1,5 +1,5 @@
 (*
- * MiniKanrenCode: miniKanren implementation.
+ * MiniKanrenCore: miniKanren implementation.
  * Copyright (C) 2015-2017
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
@@ -16,12 +16,22 @@
  * (enclosed in the file COPYING).
  *)
 
- external print_hello: unit -> unit = "caml_print_hello"
-
- let () =
-   print_hello ()
 
 open Printf
+
+module Timings = struct
+  type t = { mutable whole_time: float; mutable unif_time: float; enabled: bool}
+  let make ~enabled = { whole_time=0.0; unif_time=0.0; enabled }
+  let unif  {unif_time}  = unif_time
+  let whole {whole_time} = whole_time
+  let is_enabled {enabled} = enabled
+  let set_whole_time t ~time =
+    t.whole_time <- time;
+    t
+  let set_unif_time t ~time =
+    t.unif_time <- time;
+    t
+end
 
 module Log =
   struct
@@ -301,7 +311,7 @@ module Var =
   struct
     type env    = int
     type scope  = int
-    type anchor = int
+    type anchor = int list
 
     let tabling_env = -1
 
@@ -315,7 +325,9 @@ module Var =
       let scope = ref 0 in
       fun () -> (incr scope; !scope)
 
-    let global_anchor = 78955
+    let global_anchor = [7]
+    let register_global_anchor () =
+      Callback.register "global_anchor" global_anchor
 
     type t = {
       anchor        : anchor;
@@ -610,7 +622,7 @@ module Env :
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
          (let token = (!!!x : Var.t).Var.anchor in
-          (* (Obj.is_block !!!token) &&  *)
+          (Obj.is_block !!!token) &&
           token == !!!Var.global_anchor)
       then
         let q = (!!!x : Var.t).Var.env in
@@ -692,6 +704,10 @@ module Subst :
 
     (* [is_subsumed env s1 s2] checks that s1 is subsumed by s2 (i.e. s2 is more general than s1) *)
     val is_subsumed : Env.t -> t -> t -> bool
+
+    val register_externs : unit -> unit
+    val print: t -> (Obj.t -> string) -> unit
+    val size: t -> int
   end =
   struct
     type content = {var : Var.t; term : Obj.t }
@@ -724,15 +740,18 @@ module Subst :
       inner 0 x;
       Buffer.contents b
 
-    let () =
-      let lookup subst idx = try Some (M.find idx subst) with Not_found -> None in
+    let register_externs () =
+      let lookup subst idx = M.find idx subst in
       let extend idx var term subst =
-        (* let open Printf in
-        printf "idx: %d\n%!" idx;
-        printf "var: %s\n%!" (generic_show var);
-        printf "term: %s\n%!" (generic_show term);
-        printf "subst: %s\n%!" (generic_show subst); *)
-        M.add idx {var; term} subst
+        (* let open Printf in *)
+        (* printf "  idx: %d\n%!" idx; *)
+        (* printf "  var: %s\n%!" (generic_show var); *)
+        (* printf "  term: %s\n%!" (generic_show term); *)
+        (* printf "  subst: %s\n%!" (generic_show subst); *)
+        let ans = M.add idx {var; term} subst in
+        (* printf "  new subst: of size %d\n%!" (M.cardinal ans); *)
+        (* M.iter (fun key {term} -> printf "    %d -> %s\n%!" key (generic_show term)) ans; *)
+        ans
       in
       Callback.register "Subst.lookup" lookup;
       Callback.register "Subst.extend" extend
@@ -794,20 +813,7 @@ module Subst :
     (* N.B. Fuck the scopes *)
     external unify_in_c : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option = "caml_unify_in_c"
 
-    let unify ~scope e subst x y =
-      match unify_in_c ~scope e subst x y with
-      | (Some (prefix, subst2)) as rez ->
-          (* printf "Unif success with subst length = %d\n%!"
-            (M.cardinal subst2);
-          M.iter (fun key {term} ->
-            printf "%d -> %s \n%!" key (generic_show term);
-          ) subst2; *)
-
-          rez
-      | None -> None
-
-    (* let unify ~scope env main_subst x y = *)
-
+    let unify ~scope env main_subst x y =
       (* The idea is to do the unification and collect the unification prefix during the process.
          It is safe to modify variables on the go. There are two cases:
          * if we do unification just after a conde, then the scope is already incremented and nothing goes into
@@ -816,7 +822,7 @@ module Subst :
            the variable is be distructively substituted: we will not look on it in future.
       *)
 
-      (* let extend xi x term (prefix, sub1) =
+      let extend xi x term (prefix, sub1) =
         if occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = {var = x; term = Obj.repr term} in
@@ -864,7 +870,20 @@ module Subst :
                 )
       in
       try helper !!!x !!!y (Some ([], main_subst))
-      with Occurs_check -> None *)
+      with Occurs_check -> None
+
+    let unify ~scope e subst x y =
+      match unify_in_c ~scope e subst x y with
+      | (Some (prefix, subst2)) as rez ->
+          (* printf "Unif success with subst length = %d\n%!"
+            (M.cardinal subst2);
+          M.iter (fun key {term} ->
+            printf "%d -> %s \n%!" key (generic_show term);
+          ) subst2; *)
+
+          rez
+      | None -> None
+
 
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
         | Some s  -> begin
@@ -883,6 +902,11 @@ module Subst :
           | Some (_ , _)  -> false
         )
 
+      let size = M.cardinal
+      let print map f =
+        M.iter (fun key {term} ->
+            printf "\t\t%d -> %s\n%!" key (f @@ Obj.repr term)
+          ) map
   end
 
 exception Disequality_violated
@@ -1942,3 +1966,59 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
+
+(* TODO *)
+let pretty_generic_show ?(maxdepth= 99999) is_var x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth term =
+    if depth > maxdepth then Buffer.add_string b "..." else
+    if is_var !!!term then begin
+      let var = (!!!term : Var.t) in
+      match var.subst with
+      | Some term ->
+          bprintf b "{ _.%d with subst=" var.index;
+          inner (depth+1) term;
+          bprintf b " }"
+      | None -> bprintf b "_.%d" var.index
+    end else match wrap term with
+      | Invalid n                                         -> bprintf b "<invalid %d>" n
+      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+      | Unboxed n                                         -> bprintf b  "int<%d>" (!!!n)
+      | Boxed  (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner 0 x;
+  Buffer.contents b
+
+let logged_unif_counter = ref 0
+let unitrace shower x y : goal = fun st ->
+  incr logged_unif_counter;
+
+  (* let () =
+   *   let subst = (State.subst st) in
+   *   printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
+   *   Subst.print subst (pretty_generic_show (Env.is_var @@ State.env st) );
+   * in *)
+  let ans = (x === y) st in
+  printf "  %d:  unify '%s' and '%s'"
+    !logged_unif_counter
+    (shower (helper_of_state st) !!!x)
+    (shower (helper_of_state st) !!!y);
+  let () =
+    match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
+  in
+  ans
+
+
+external unify_preload_stuff: unit -> unit = "caml_unify_preload_stuff"
+
+let () =
+  Var.register_global_anchor ();
+  Subst.register_externs ();
+  unify_preload_stuff ();
+  ()
+
