@@ -18,6 +18,7 @@ open Location
 (*****************************************************************************************************************************)
 
 let eq_name          = "="
+let neq_name         = "<>"
 let true_name        = "true"
 let false_name       = "false"
 
@@ -306,14 +307,18 @@ let get_translator start_index =
 #if OCAML_VERSION > (4, 02, 2)
       let make a = (Nolabel, Some a) in
 #else
-      let make a = ("", Some a , Required) in
+      let make a = ("", Some a, Required) in
 #endif
       let args = match fresh_vars with
       | [] -> [texp_unit]
       | xs -> xs
       in
+      let gen_constr_name name = match name with
+      | Lident "[]" -> Lident "nil"
+      | Lident "::" -> Lident "%"
+      | _           -> lowercase_lident ~to_lower:true name in
       Typedtree.Texp_apply
-        (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
+        (Texp_ident (path_of_longident name.txt, {name with txt = gen_constr_name name.txt}, dummy_val_desc) |> expr_desc_to_expr,
           List.map make args)
         |> expr_desc_to_expr
     in
@@ -379,17 +384,14 @@ let get_translator start_index =
       let funs_for_subst    = List.map2 create_fun lambda_arg_names unifies_for_subst |> List.map (fun x -> [x]) in
       let body_with_subst   = List.fold_left create_apply body_with_lambda funs_for_subst in
 
-      let cnstr_desc =
-        match pattern.pat_desc with
-        | Tpat_constant const          -> Texp_constant const
-        | Tpat_construct (name, cd, _) -> Texp_construct (name, cd, fresh_args) in
-
       let cnstr             =
         match pattern.pat_desc with
         | Tpat_constant const          -> (Texp_constant const) |> expr_desc_to_expr |> create_inj
         | Tpat_construct ({txt = Lident s}, _, _) when (s = "true" || s = "false") ->
             let flid = Location.mknoloc (Lident s) in
             Texp_ident (path_of_longident (Lident s), flid, dummy_val_desc) |> expr_desc_to_expr |> create_inj
+        | Tpat_construct ({txt = Lident "[]"}, _, _) -> create_apply (create_ident "nil") [texp_unit]
+        | Tpat_construct ({txt = Lident "::"}, _, _) -> create_apply (create_ident "%") fresh_args
         | Tpat_construct (name, cd, [])  ->
             let flid =
               let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
@@ -526,7 +528,7 @@ let get_translator start_index =
 
   (****)
 
-  let translate_eq (sub : Tast_mapper.mapper) =
+  let translate_eq (sub : Tast_mapper.mapper) is_equality =
 
     let name_arg_l  = create_fresh_var_name () in
     let name_arg_r  = create_fresh_var_name () in
@@ -543,12 +545,12 @@ let get_translator start_index =
     let const_true  = create_constructor true_name [] |> create_inj in
     let const_false = create_constructor false_name [] |> create_inj in
 
-    let out_unify_true  = create_unify ident_out const_true in
-    let out_unify_false = create_unify ident_out const_false in
+    let out_unify_eq    = create_unify ident_out (if is_equality then const_true else const_false) in
+    let out_unify_neq   = create_unify ident_out (if is_equality then const_false else const_true) in
     let l_unify_r       = create_unify ident_l ident_r in
     let l_des_constr_r  = create_des_constr ident_l ident_r in
-    let first_and       = create_and l_unify_r out_unify_true in
-    let second_and      = create_and l_des_constr_r out_unify_false in
+    let first_and       = create_and l_unify_r out_unify_eq in
+    let second_and      = create_and l_des_constr_r out_unify_neq in
     let full_or         = create_or first_and second_and in
 
     let apply_l = create_apply ident_arg_l [ident_l] in
@@ -583,7 +585,9 @@ let get_translator start_index =
 
     | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
 
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub true
+
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq sub false
 
     | _ -> Tast_mapper.default.expr sub x in
 
@@ -675,6 +679,10 @@ let beta_reductor =
       let new_rest = if var_in_binds then rest else substitutor rest var subst in
       let exp_desc = Texp_let (rec_flag, new_vbs, new_rest) in
       { expr with exp_desc }
+    | Texp_construct (name, desc, exprs) ->
+      let new_exprs = List.map (fun x -> substitutor x var subst) exprs in
+      let exp_desc = Texp_construct (name, desc, new_exprs) in
+      {  expr with exp_desc }
     | _ -> expr in
 
   let rec beta_reduction expr args =
