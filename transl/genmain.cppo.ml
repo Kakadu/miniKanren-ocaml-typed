@@ -332,6 +332,7 @@ let get_translator start_index =
   (****)
 
   let translate_match (sub : Tast_mapper.mapper) expr cases (typ : Types.type_expr) =
+    (* typ is the type of RHSes *)
 
     let argument_names =
       let rec calculate (typ : Types.type_expr) =
@@ -343,7 +344,6 @@ let get_translator start_index =
       in
       calculate typ
     in
-
     let arguments = List.map create_ident argument_names in
 
     let translated_expr = sub.expr sub expr in
@@ -419,10 +419,7 @@ let get_translator start_index =
       List.fold_right create_fresh fresh_arg_names cnstr_and_body
     in
 
-    let translated_cases     = cases |> List.map translate_case
-(*      |> fold_right0 create_or *)
-      |> create_conde
-    in
+    let translated_cases     = cases |> List.map translate_case  |> create_conde in
     let upper_exp_with_cases = create_and unify_expr translated_cases in
     let all_without_lambda   = create_fresh unify_var_name upper_exp_with_cases in
 
