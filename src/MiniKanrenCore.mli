@@ -589,3 +589,17 @@ module Fmap6 (T : T6) :
 val reify : Env.t -> ('a, 'a logic) injected -> 'a logic
 
 val prjc : (int -> 'a list -> 'a) -> Env.t -> ('a, 'a logic) injected -> 'a
+
+
+module Presburger : sig
+  module T : sig
+    type 'a t
+    type zbool
+    type zint
+    val int : int -> zint t
+    val ( <= ) : zint t -> zint t -> zbool t
+    val ( ! )  : ('a,'b) injected -> zint t
+  end
+end
+
+val presburo : Presburger.T.zbool Presburger.T.t list -> goal

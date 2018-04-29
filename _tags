@@ -1,6 +1,8 @@
 true: debug, rectypes, color(auto), bin_annot, keep_asm
 true: short_paths
 
+<z3demo.*>: package(z3overlay,zarith)
+
 <ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std)
 <ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
 
@@ -10,13 +12,13 @@ true: short_paths
 #<src/MiniKanrenCore.ml>: use_time_log
 <src/MiniKanrenCore*.*> or <src/MiniKanrenStd*.*>: opaque
 <src/MiniKanren*.*>: package(unix),syntax(camlp5o),package(GT,GT.syntax.all),package(logger.syntax)
-<src/*.ml*>: package(GT)
+<src/*.ml*>: package(GT,z3overlay)
 
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(unix),package(str)
 <regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
 
-<regression/test0*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
+<regression/test0*.*>: package(GT,GT.syntax.all,z3overlay), syntax(camlp5o)
 
 <regression/test*.ml> : syntax(camlp5o), package(logger.syntax)
 <regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)

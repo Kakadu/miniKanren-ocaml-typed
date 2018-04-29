@@ -1,8 +1,9 @@
-PKG GT
+PKG GT z3overlay zarith
 SRC src src_test
 SRC regression
 SRC plugin
 SRC camlp5
+
 B _build
 B _build/src
 B _build/plugin

@@ -1,5 +1,5 @@
 (*
- * MiniKanrenCode: miniKanren implementation.
+ * MiniKanrenCore: miniKanren implementation.
  * Copyright (C) 2015-2017
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
@@ -311,6 +311,39 @@ module VarSet = Set.Make(Var)
 module VarMap = Map.Make(Var)
 module VarTbl = Hashtbl.Make(Var)
 
+let (!!!) = Obj.magic
+
+
+let pretty_generic_show ?(maxdepth= 99999) is_var x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth term =
+    if depth > maxdepth then Buffer.add_string b "..." else
+    if is_var !!!term then begin
+      let var = (!!!term : Var.t) in
+      match var.subst with
+      | Some term ->
+          bprintf b "{ _.%d with subst=" var.index;
+          inner (depth+1) term;
+          bprintf b " }"
+      | None -> bprintf b "_.%d" var.index
+    end else if Obj.is_int !!!term then bprintf b  "int<%d>" (!!!term)
+    else begin
+      assert (Obj.is_block !!!term);
+      let t = Obj.tag !!!term in
+      let l = Obj.size !!!term in
+      let f = Obj.field !!!term in
+      Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+      for i = 0 to l - 1 do (
+        inner (depth+1) (f i);
+        if i<l-1 then Buffer.add_string b " "
+      ) done;
+      Buffer.add_string b ">"
+    end
+  in
+  inner 0 x;
+  Buffer.contents b
+
 (* [Term] - encapsulates unsafe operations on OCaml's values extended with logic variables;
  *   provides set of functions to traverse these values
  *)
@@ -374,10 +407,9 @@ module Term :
       Obj.tag dummy, Obj.size dummy
 
     let is_var tx sx x =
-      if (tx = var_tag) && (sx = var_size) then
-         let anchor = (Obj.obj x : Var.t).Var.anchor in
-         (Obj.is_block @@ Obj.repr anchor) && (Var.valid_anchor anchor)
-      else false
+      (tx = var_tag) && (sx = var_size) &&
+      let anchor = (Obj.obj x : Var.t).Var.anchor in
+      (Obj.is_block @@ Obj.repr anchor) && (Var.valid_anchor anchor)
 
     let is_box t =
       if (t <= Obj.last_non_constant_constructor_tag) &&
@@ -490,8 +522,6 @@ module Term :
       ~fvar:(fun acc v -> Hashtbl.hash (acc, Var.hash v))
       ~fval:(fun acc _ x -> Hashtbl.hash (acc, Hashtbl.hash x))
   end
-
-let (!!!) = Obj.magic
 
 module Env :
   sig
@@ -624,6 +654,7 @@ module Subst :
      *)
     val unify : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (Binding.t list * t) option
 
+    val walk_hack : Env.t -> t -> 'a -> 'a
     val reify : f:(Var.t -> Var.t) -> Env.t -> t -> 'a -> 'a
 
     (* [merge env s1 s2] merges two substituions *)
@@ -662,6 +693,14 @@ module Subst :
         | None   -> Value t
       in
       walkv env subst x
+
+    let walk_hack env subst x =
+      printf "walk_hack %s\n%!" @@ pretty_generic_show (Env.is_var env) x;
+      match walk env subst !!!x with
+      | Var v -> !!!v
+      | Value v ->
+          printf "walk_hack found a value %s\n%!" @@ pretty_generic_show (Env.is_var env) !!!v;
+          !!!v
 
     (* same as [Term.map] but performs [walk] on the road *)
     let map ~fvar ~fval env subst x =
@@ -871,12 +910,15 @@ module Disequality :
      *)
     val of_dnf : Env.t -> dnf -> t list
 
-    (* [check ~prefix env subst diseq] - checks that disequality is not violated in refined substitution.
+    (* [check_exn ~prefix env subst diseq] - checks that disequality is not violated
+     * in refined substitution.
      *   [prefix] is a substitution prefix, i.e. new bindings obtained during unification.
      *   This function may rebuild internal representation of constraints and thus it returns new object.
      *   Raises [Disequality_violated].
      *)
-    val check : prefix:Binding.t list -> Env.t -> Subst.t -> t -> t
+    val check_exn : prefix:Binding.t list -> Env.t -> Subst.t -> t -> t
+
+    val check : prefix:Binding.t list -> Env.t -> Subst.t -> t -> t option
 
     (* [extend ~prefix env diseq] - extends disequality with new bindings.
      *   New bindings are interpreted as formula in DNF.
@@ -936,7 +978,7 @@ module Disequality :
          *   This function is designed to incrementally refine disequalities
          *   with a series of more and more specialized substitutions.
          *   If arbitary substitutions are passed the result may be invalid.
-             *)
+         *)
         val check : Env.t -> Subst.t -> t -> t
 
         (* [refine env subst disj] - returns `disequality` prefix along with substitution specialized with that prefix.
@@ -1063,7 +1105,7 @@ module Disequality :
       ListLabels.fold_left conjs ~init:empty
         ~f:(fun acc pair -> extend ~prefix:[pair] env acc)
 
-    let check ~prefix env subst cstore =
+    let check_exn ~prefix env subst cstore =
       let revisit_conjuncts var_idx conj =
         ListLabels.fold_left conj
             ~init:([], [])
@@ -1101,6 +1143,10 @@ module Disequality :
           let cstore = extend rebound2 cstore in
           cstore
         )
+
+    let check ~prefix env subst cstore =
+      try Some (check_exn ~prefix env subst cstore)
+      with Disequality_violated -> None
 
     let reify env subst t var =
       let conjs = Index.get var.Var.index t in
@@ -1204,12 +1250,55 @@ module Disequality :
       (mapping, cs')
 end
 
+module Z3 = ZZ3.Make (struct let ctx = Z3.mk_context [] end)
+module Presburger = struct
+  let mangle_to_z3 n = sprintf "mk_%d" n
+  let merge_term_lists = (@)
+
+  module T = struct
+    type zbool = Z3.zbool
+    type zint = Z3.zint
+    type reifier = Var.t -> Var.t
+    type 'a t = reifier * Env.t -> 'a Z3.term
+
+    let int n = fun _env -> Z3.T.int n
+    let ( <= ) l r env = Z3.T.( <= ) (l env) (r env)
+
+    let (!) (x: 'injected) : _ t = fun (r,env) ->
+      let x = r !!!x in
+      (* printf "after reification: `%s`\n%!"
+       *   (pretty_generic_show (Env.is_var env) rrr); *)
+      if Env.is_var env x
+      then
+        let n = (!!!x : Var.t).Var.index in
+        (* let () = printf " var %d\n%!" n in *)
+        let s = Z3.Symbol.declare Int (mangle_to_z3 n) in
+        let open Z3.T in ( ! s)
+      else
+        let n : int = !!!x in
+        (* let () = printf "not a var: an integer %d\n%!" n in *)
+        Z3.T.int n
+
+    (* let (_:int) = (!) *)
+  end
+
+  let check_sat (env: Env.t) reifier ts =
+    let solver = Z3.Solver.make () in
+    List.iter (fun t -> Z3.Solver.add ~solver @@ t (reifier,env) ) ts;
+    match Z3.Solver.check ~solver [] with
+    | Sat _ -> Some ()
+    | Unsat _ -> print_endline "\t\tUnsat"; None
+    | Unkown _ -> print_endline "\t\tUnknown"; None
+
+end
+
 module State =
   struct
     type t =
       { env   : Env.t
       ; subst : Subst.t
       ; ctrs  : Disequality.t
+      ; presbs: Presburger.T.zbool Presburger.T.t list
       ; scope : Var.scope
       }
 
@@ -1217,12 +1306,14 @@ module State =
       { env   = Env.empty ()
       ; subst = Subst.empty
       ; ctrs  = Disequality.empty
+      ; presbs= []
       ; scope = Var.new_scope ()
       }
 
     let env   {env} = env
     let subst {subst} = subst
     let constraints {ctrs} = ctrs
+    let presbs    {presbs} = presbs
     let scope {scope} = scope
 
     let new_var {env; scope} =
@@ -1232,16 +1323,18 @@ module State =
 
     let incr_scope st = {st with scope = Var.new_scope ()}
 
-    let unify x y ({env; subst; ctrs; scope} as st) =
+    let unify x y ({env; subst; ctrs; scope; presbs} as st) =
       LOG[perf] (Log.unify#enter);
+      let (>>=) x f = match x with None -> None | Some y -> f y in
+      let reifier = Subst.reify ~f:(fun x -> x) env subst in
+      (* let reifier = Subst.walk_hack env subst in *)
       let result =
-        match Subst.unify ~scope env subst x y with
-        | None -> None
-        | Some (prefix, s) ->
-          try
-            let ctrs' = Disequality.check ~prefix env s ctrs in
-            Some {st with subst=s; ctrs=ctrs'}
-          with Disequality_violated -> None
+        Subst.unify ~scope env subst x y        >>= fun (prefix, s) ->
+        Disequality.check ~prefix env s ctrs    >>= fun ctrs' ->
+        Presburger.check_sat env reifier presbs >>= fun () ->
+        Some {st with subst=s; ctrs=ctrs'}
+          (* Maximally ineffective. Need to run checking only if some variables
+             involved in presburger constraints has beed grounded *)
       in
       LOG[perf] (Log.unify#leave);
       result
@@ -1254,15 +1347,27 @@ module State =
           let ctrs' = Disequality.extend ~prefix env ctrs in
           Some {st with ctrs=ctrs'}
 
+    let add_presburger eqs  ({env; subst; ctrs; presbs; scope} as st) =
+      (* need to check for sat and add *)
+
+      let new_presbs = eqs @ presbs in
+      (* let reifier_walker = Subst.reify ~f:(fun k -> k) env subst in *)
+      let reifier = Subst.walk_hack env subst in
+      let reifier = Subst.reify ~f:(fun x -> x) env subst in
+      match Presburger.check_sat env reifier new_presbs with
+      | Some () -> Some {st with presbs = new_presbs }
+      | None -> None
+
     let merge
-      {env=env1; subst=subst1; ctrs=ctrs1; scope=scope1}
-      {env=env2; subst=subst2; ctrs=ctrs2; scope=scope2} =
+      {env=env1; subst=subst1; ctrs=ctrs1; presbs=presbs1; scope=scope1}
+      {env=env2; subst=subst2; ctrs=ctrs2; presbs=presbs2; scope=scope2} =
       let env = Env.merge env1 env2 in
       match Subst.merge env subst1 subst2 with
       | None       -> None
       | Some subst -> Some
         { env; subst
         ; ctrs  = Disequality.merge env ctrs1 ctrs2
+        ; presbs= Presburger.merge_term_lists presbs1 presbs2
         ; scope = Var.new_scope ()
         }
 
@@ -1271,12 +1376,13 @@ module State =
       let cs = Disequality.project env subst cs @@ Subst.free_vars env subst x in
       {st with ctrs = Disequality.of_cnf env cs}
 
-    let normalize ({env; subst; ctrs; scope} as st) x =
+    let normalize ({env; subst; ctrs; presbs; scope} as st) x =
       let cs = Disequality.to_cnf env subst ctrs in
       let cs = Disequality.project env subst cs @@ Subst.free_vars env subst x in
+      (* TODO: normalize presburger terms? *)
       match Disequality.of_dnf env @@ Disequality.cnf_to_dnf cs with
       | [] -> [{st with ctrs=Disequality.empty}]
-      | cs -> List.map (fun ctrs -> {env; subst; ctrs; scope}) cs
+      | cs -> List.map (fun ctrs -> {env; subst; ctrs; scope; presbs}) cs
 
     let reify {env; subst; ctrs} x =
       let rec helper forbidden x =
@@ -1305,6 +1411,11 @@ type goal = State.t Stream.t goal'
 
 let success st = Stream.single st
 let failure _  = Stream.nil
+
+let presburo eqs st =
+  match State.add_presburger eqs st with
+  | None -> Stream.nil
+  | Some st -> Stream.single st
 
 let (===) x y st =
   match State.unify x y st with
@@ -1859,7 +1970,7 @@ module Table :
                   let answ_ctrs = Disequality.of_cnf env answ_ctrs in
                   try
                     (* check answ_ctrs against external substitution *)
-                    let ctrs = Disequality.check ~prefix:(Subst.split subst) env subst' answ_ctrs in
+                    let ctrs = Disequality.check_exn ~prefix:(Subst.split subst) env subst' answ_ctrs in
                     let f = Stream.from_fun @@ fun () -> helper tail seen in
                     Stream.cons {st' with ctrs = Disequality.merge env ctrs' ctrs} f
                   with Disequality_violated -> helper tail seen
@@ -1908,7 +2019,7 @@ module Table :
           Cache.add cache answ;
           try
             (* TODO: we only need to check diff, i.e. [subst' \ subst] *)
-            let ctrs = Disequality.check ~prefix:(Subst.split subst') env subst' ctrs in
+            let ctrs = Disequality.check_exn ~prefix:(Subst.split subst') env subst' ctrs in
             success {st' with ctrs = Disequality.merge env ctrs ctrs'}
           with Disequality_violated -> failure ()
         end

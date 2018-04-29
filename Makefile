@@ -18,11 +18,13 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean clean_tests install uninstall tests test regression promote_all \
 	ppx doc \
-	only-toplevel toplevel lib tester bundle plugin samples
+	only-toplevel toplevel lib tester bundle plugin samples z3demo
 
 .DEFAULT_GOAL: all
 
-all: bundle samples
+all: z3demo bundle samples
+z3demo:
+	$(OB) z3demo.native
 bundle: lib plugin
 lib:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
@@ -42,8 +44,8 @@ clean: clean_tests
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto \
-	017tabling 018prjc
-
+	017tabling 018prjc 019presb1
+REGRES_CASES := 019presb
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
 NATIVE_TEST_EXECUTABLES += regression/test$(1).native

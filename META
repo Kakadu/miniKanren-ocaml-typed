@@ -1,6 +1,6 @@
 version = "0.1"
 description = "ocanren"
-requires = "GT,unix"
+requires = "GT,unix,z3overlay"
 archive(byte) = "MiniKanren.cma"
 archive(native) = "MiniKanren.cmxa"
 
