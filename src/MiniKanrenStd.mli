@@ -25,12 +25,12 @@ open MiniKanrenCore
 (** Abstract list type *)
 @type ('a, 'l) list =
 | Nil
-| Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr
+| Cons of 'a * 'l with show, gmap,  eq, compare, foldl, foldr
 
 (** Abstract nat type *)
 @type 'a nat =
 | O
-| S of 'a with show, html, eq, compare, foldl, foldr, gmap
+| S of 'a with show,  eq, compare, foldl, foldr, gmap
 
 (** {3 Relational pairs} *)
 module Pair :
@@ -56,7 +56,7 @@ module Pair :
          foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) ground;
-         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer;
+         (* html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer; *)
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) ground -> string >)
       GT.t
 
@@ -68,7 +68,7 @@ module Pair :
          foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) logic -> ('c, 'd) logic;
-         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer;
+         (* html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer; *)
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) logic -> string >)
       GT.t
 
@@ -110,7 +110,7 @@ module Option :
          foldl   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
          gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
-         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
+         (* html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer; *)
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
@@ -122,7 +122,7 @@ module Option :
          foldl   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
          gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
-         html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+         (* html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer; *)
          show    : ('a -> string) -> 'a logic -> string >)
       GT.t
 
@@ -167,7 +167,7 @@ module Bool :
          foldl   : 'a -> ground -> 'a;
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
-         html    : ground -> HTML.viewer;
+         (* html    : ground -> HTML.viewer; *)
          show    : ground -> string >)
       GT.t
 
