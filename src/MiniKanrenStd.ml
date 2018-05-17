@@ -18,8 +18,8 @@
 
 open MiniKanrenCore
 
-@type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap, eq, compare, foldl, foldr;;
-@type 'a nat = O | S of 'a with show, eq, compare, foldl, foldr, gmap;;
+@type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap, eq, html, compare, foldl, foldr;;
+@type 'a nat = O | S of 'a with show, eq, compare, html, foldl, foldr, gmap;;
 
 module Pair = 
   struct

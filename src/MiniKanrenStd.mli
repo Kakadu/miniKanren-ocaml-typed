@@ -25,12 +25,12 @@ open MiniKanrenCore
 (** Abstract list type *)
 @type ('a, 'l) list =
 | Nil
-| Cons of 'a * 'l with show, gmap,  eq, compare, foldl, foldr
+| Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr
 
 (** Abstract nat type *)
 @type 'a nat =
 | O
-| S of 'a with show,  eq, compare, foldl, foldr, gmap
+| S of 'a with show, html, eq, compare, foldl, foldr, gmap
 
 (** {3 Relational pairs} *)
 module Pair :
