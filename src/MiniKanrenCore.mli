@@ -90,7 +90,7 @@ type goal = State.t Stream.t goal'
 (** A type of a logic value *)
 @type 'a logic = private
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap,  eq, compare, foldl, foldr
+| Value of 'a with show, gmap,  eq, compare, foldl, foldr,html
 
 (** GT-compatible typeinfo for logics *)
 val logic :

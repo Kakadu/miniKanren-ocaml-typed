@@ -19,7 +19,7 @@
 open MiniKanrenCore
 
 @type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap, eq, html, compare, foldl, foldr;;
-@type 'a nat = O | S of 'a with show, eq, compare, html, foldl, foldr, gmap;;
+@type 'a nat = O | S of 'a with show, eq, compare, foldl, foldr, gmap, html;;
 
 module Pair = 
   struct
@@ -254,10 +254,10 @@ module Nat =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n = GT.html   (nat) this#html    n
+          (* method html    n = GT.html   (nat) this#html    n *)
           method eq      n = GT.eq     (nat) this#eq      n
           method compare n = GT.compare(nat) this#compare n
-          method foldr   n = GT.foldr  (nat) this#foldr   n
+          (* method foldr   n = GT.foldr  (nat) this#foldr   n *)
           method foldl   n = GT.foldl  (nat) this#foldl   n
           method gmap    n = GT.gmap   (nat) this#gmap    n
           method show    n = GT.show   (nat) this#show    n
@@ -268,10 +268,10 @@ module Nat =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (logic') (GT.html   (nat) this#html   ) n
+          (* method html    n   = GT.html   (logic') (GT.html   (nat) this#html   ) n *)
           method eq      n m = GT.eq     (logic') (GT.eq     (nat) this#eq     ) n m
           method compare n m = GT.compare(logic') (GT.compare(nat) this#compare) n m
-          method foldr   a n = GT.foldr  (logic') (GT.foldr  (nat) this#foldr  ) a n
+          (* method foldr   a n = GT.foldr  (logic') (GT.foldr  (nat) this#foldr  ) a n *)
           method foldl   a n = GT.foldl  (logic') (GT.foldl  (nat) this#foldl  ) a n
           method gmap    n   = GT.gmap   (logic') (GT.gmap   (nat) this#gmap   ) n
           method show    n   = GT.show   (logic') (GT.show   (nat) this#show   ) n
@@ -380,25 +380,26 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    fa l = GT.html   (list) fa (this#html    fa) l
+          (* method html    fa l = GT.html   (list) fa (this#html    fa) l *)
           method eq      fa l = GT.eq     (list) fa (this#eq      fa) l
           method compare fa l = GT.compare(list) fa (this#compare fa) l
-          method foldr   fa l = GT.foldr  (list) fa (this#foldr   fa) l
+          (* method foldr   fa l = GT.foldr  (list) fa (this#foldr   fa) l *)
           method foldl   fa l = GT.foldl  (list) fa (this#foldl   fa) l
           method gmap    fa l = GT.gmap   (list) fa (this#gmap    fa) l
-          method show    fa l = "[" ^
-            let rec inner l =
-              (GT.transform(list)
-                 (GT.lift fa)
-                 (GT.lift inner)
-                 (object inherit ['a,'a ground] @list[show]
-                    method c_Nil   _ _      = ""
-                    method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                  end)
-                 ()
-                 l
-              )
-            in inner l ^ "]"
+          method show    fa l =
+
+            let rec inner xs =
+              GT.fix0 (fun fself ->
+               GT.transform(list)
+                  (object inherit ['a,'a ground,_] show_list_t fself fa fself
+                     method c_Nil   ()      = ""
+                     method c_Cons  () x xs =
+                        (fa x) ^ (match xs with Nil -> "" | _ -> "; " ^ (fself xs))
+                   end)
+                  ()
+                ) xs
+            in
+            "[" ^ inner l ^ "]"
         end
     }
 
@@ -410,23 +411,25 @@ module List =
           method gmap    fa l = GT.gmap    (logic') (GT.gmap    (list) fa (this#gmap    fa)) l
           method eq      fa l = GT.eq      (logic') (GT.eq      (list) fa (this#eq      fa)) l
           method foldl   fa l = GT.foldl   (logic') (GT.foldl   (list) fa (this#foldl   fa)) l
-          method foldr   fa l = GT.foldr   (logic') (GT.foldr   (list) fa (this#foldr   fa)) l
-          method html    fa l = GT.html    (logic') (GT.html    (list) fa (this#html    fa)) l
+          (* method foldr   fa l = GT.foldr   (logic') (GT.foldr   (list) fa (this#foldr   fa)) l *)
+          (* method html    fa l = GT.html    (logic') (GT.html    (list) fa (this#html    fa)) l *)
           method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
-            GT.show(logic')
-              (fun l -> "[" ^
-                 let rec inner l =
-                    GT.transform(list)
-                      (GT.lift fa)
-                      (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] @list[show]
-                         method c_Nil   _ _      = ""
-                         method c_Cons  i s x xs =
-                           x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                       end)
-
-                    () l
-                   in inner l ^ "]"
+            GT.show(logic') (fun l ->
+                let rec inner xs =
+                  GT.fix0 (fun fself ->
+                      GT.transform(list)
+                        (object inherit ['a,'a ground,_] show_list_t fself fa fself
+                          method c_Nil   ()      = ""
+                          method c_Cons  () x xs =
+                            Printf.sprintf "%s%s%s"
+                              (fa x)
+                              (match xs with Nil -> "" | _ -> "; ")
+                              (GT.show(logic) fself xs)
+                        end)
+                        ()
+                    ) xs
+                in
+                "[" ^ inner l ^ "]"
               )
               l
         end
