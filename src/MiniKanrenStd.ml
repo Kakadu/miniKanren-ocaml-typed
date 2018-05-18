@@ -372,7 +372,8 @@ module List =
     let conso x y = MiniKanrenCore.inj @@ F.distrib (Cons (x, y))
 
     type 'a ground = ('a, 'a ground) t
-    type 'a logic  = ('a, 'a logic) t logic'
+    type 'a logic2 = ('a, 'a logic2 logic') t
+    type 'a logic  = 'a logic2 logic'
 
     let rec reify r1 h = F.reify r1 (reify r1) h
 
@@ -387,8 +388,7 @@ module List =
           method foldl   fa l = GT.foldl  (list) fa (this#foldl   fa) l
           method gmap    fa l = GT.gmap   (list) fa (this#gmap    fa) l
           method show    fa l =
-
-            let rec inner xs =
+            let rec inner (xs: _ ground) =
               GT.fix0 (fun fself ->
                GT.transform(list)
                   (object inherit ['a,'a ground,_] show_list_t fself fa fself
@@ -414,24 +414,22 @@ module List =
           (* method foldr   fa l = GT.foldr   (logic') (GT.foldr   (list) fa (this#foldr   fa)) l *)
           (* method html    fa l = GT.html    (logic') (GT.html    (list) fa (this#html    fa)) l *)
           method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
-            GT.show(logic') (fun l ->
-                let rec inner xs =
-                  GT.fix0 (fun fself ->
-                      GT.transform(list)
-                        (object inherit ['a,'a ground,_] show_list_t fself fa fself
-                          method c_Nil   ()      = ""
-                          method c_Cons  () x xs =
-                            Printf.sprintf "%s%s%s"
-                              (fa x)
-                              (match xs with Nil -> "" | _ -> "; ")
-                              (GT.show(logic) fself xs)
-                        end)
-                        ()
-                    ) xs
-                in
-                "[" ^ inner l ^ "]"
-              )
-              l
+            let rec inner xs =
+              GT.fix0 (fun fself ->
+                  GT.transform(list)
+                    (object inherit ['a, 'a logic, _] show_list_t fself fa
+                        (GT.show logic' fself)
+                      method c_Nil   ()      = ""
+                      method c_Cons  () x xs =
+                        Printf.sprintf "%s%s%s"
+                          (fa x)
+                          (match xs with Value Nil -> "" | _ -> "; ")
+                          (GT.show logic' fself xs)
+                    end)
+                    ()
+                ) xs
+            in
+            "[" ^ (GT.show(logic') inner l) ^ "]"
         end
     }
 
