@@ -1,23 +1,15 @@
 open GT
 open MiniKanren
 open Std
-(*
-module Nat =
-  struct
 
-    include Nat
+@type 'nat move = Forward of 'nat | Backward of 'nat | Unload of 'nat | Fill of 'nat
+with show, gmap
 
-    let show = show(Nat.logic)
-    let reify = Nat.reify
+module M = Fmap (struct type 'a t = 'a move let fmap f = gmap(move) f end);;
 
-    let notZero n = fresh (x) (n === Nat.succ x)
-  end
-  *)    
-@type 'nat move = Forward of 'nat | Backward of 'nat | Unload of 'nat | Fill of 'nat with show, gmap
+@type lmove = Nat.logic move logic with show
 
-module M = Fmap (struct type 'a t = 'a move let fmap f = gmap(move) f end)
-
-let show_move  m = show(logic) (show(move) (show(Nat.logic))) m
+let show_move = lmove.GT.plugins#show
 let show_moves m = show(List.logic) show_move m
 
 let reify_moves m = List.reify (M.reify Nat.reify) m
@@ -35,7 +27,7 @@ let rec lookupo d stations q =
       ((d' === d &&& (some q' === q)) |||
        (Nat.(<) d' d &&& lookupo d ss q) |||
        (Nat.(>) d' d &&& (q === none ()))  
-      )    
+      )
     )
   ]
 

@@ -231,18 +231,19 @@ let logic = {logic with
       method foldl     = logic.plugins#foldl
       method foldr     = logic.plugins#foldr
       method show fa x =
-        GT.transform(logic)
-          (GT.lift fa)
-          (object inherit ['a] @logic[show]
-             method c_Var _ s i cs =
-               let c = match cs with
-               | [] -> ""
-               | _  -> sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
-               in
-               sprintf "_.%d%s" i c
-             method c_Value _ _ x = x.GT.fx ()
-           end)
-          ()
+        GT.fix0 (fun (fself: 'a logic -> string) ->
+            GT.transform(logic)
+              (object inherit ['a,_] @logic[show] fself fa
+                method c_Var () i cs =
+                  sprintf "_.%d%s" i
+                    (match cs with
+                     | [] -> ""
+                     | _  -> sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ fself l) cs)
+                    )
+                method c_Value () x = fa x
+              end)
+              ()
+          )
           x
     end
 }

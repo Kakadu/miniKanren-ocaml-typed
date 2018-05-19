@@ -69,16 +69,26 @@ let rec eval state moves state' =
 let reify_state =
   let reify_qua = Pair.reify (Pair.reify reify reify) (Pair.reify reify reify) in
   Pair.reify reify_qua reify_qua
+;;
+
+(* Lines below could work if we add some classes to the Pair module *)
+(* @type bpl = (Bool.logic, Bool.logic) Pair.logic with show;;
+ * @type lstate = ((bpl,bpl) Pair.logic, (bpl,bpl) Pair.logic) Pair.logic with show;; *)
 
 let show_state =
-  let show_qua = show(Pair.logic) (show(Pair.logic) (show(Bool.logic)) (show(Bool.logic))) (show(Pair.logic) (show(Bool.logic)) (show(Bool.logic))) in
+  (* GT.show lstate *)
+  let show_qua =
+    show(Pair.logic)
+      (show(Pair.logic) (show(Bool.logic)) (show(Bool.logic)))
+      (show(Pair.logic) (show(Bool.logic)) (show(Bool.logic)))
+  in
   show(Pair.logic) show_qua show_qua
 
 let reify_solution s = s#reify @@ List.reify reify
 let show_solution = show(List.logic) (show(logic) (show move))
 
 let id x = x
-             
+
 let _ =
   Stream.iter (fun s -> Printf.printf "%s\n" @@ show_state @@ s#reify reify_state) @@
   run q (fun q -> eval (pair (qua !true !true !true !true) (qua !false !false !false !false)) (nil ()) q) id;

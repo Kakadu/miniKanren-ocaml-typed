@@ -37,13 +37,13 @@ module Pair :
   sig
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
-    type 'a logic' = 'a logic
+    type 'a logic' = 'a logic;;
 
-    (** Synonym for regular option type *)
+    (** Synonym for regular pairtype *)
     type ('a, 'b) t = 'a * 'b
 
-    (** Ground option (the regular one) *)
-    type ('a, 'b) ground = 'a * 'b
+    (** Ground pair (the regular one) *)
+    type ('a, 'b) ground = 'a * 'b;;
 
     (** Logic option *)
     type ('a, 'b) logic = ('a * 'b) logic'
@@ -56,7 +56,7 @@ module Pair :
          foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) ground;
-         (* html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer; *)
+         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer;
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) ground -> string >)
       GT.t
 
@@ -68,7 +68,7 @@ module Pair :
          foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) logic -> ('c, 'd) logic;
-         (* html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer; *)
+         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer;
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) logic -> string >)
       GT.t
 
@@ -110,7 +110,7 @@ module Option :
          foldl   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
          gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
-         (* html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer; *)
+         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
@@ -122,7 +122,7 @@ module Option :
          foldl   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
          gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
-         (* html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer; *)
+         html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
          show    : ('a -> string) -> 'a logic -> string >)
       GT.t
 
@@ -167,7 +167,7 @@ module Bool :
          foldl   : 'a -> ground -> 'a;
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
-         (* html    : ground -> HTML.viewer; *)
+         html    : ground -> HTML.viewer;
          show    : ground -> string >)
       GT.t
 
