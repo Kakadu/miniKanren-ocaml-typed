@@ -1,4 +1,3 @@
-open GT
 open MiniKanren
 open Std
 open Tester
@@ -24,6 +23,8 @@ let demo2 q =
 
 let intlist_reifier c xs =
   List.reify MiniKanren.reify c xs
+
+open GT
 
 let show_int = show(int)
 let show_int_list = show(List.ground) show_int
