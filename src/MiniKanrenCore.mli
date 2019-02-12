@@ -88,9 +88,11 @@ type goal = State.t Stream.t goal'
 (** {3 Logic values} *)
 
 (** A type of a logic value *)
-@type 'a logic = private
+type 'a logic = private
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a
+[@@deriving gt {show; gmap}]
+(* with show, gmap, html, eq, compare, foldl, foldr *)
 
 (** GT-compatible typeinfo for logics *)
 val logic :

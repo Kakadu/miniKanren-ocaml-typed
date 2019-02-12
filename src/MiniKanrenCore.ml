@@ -147,7 +147,7 @@ module Stream =
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
-          let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
+          let helper ({zz} as s) = {s with zz = fun () -> bind (zz ()) f} in
           Waiting (List.map helper ss)
         | s          -> bind s f
 
@@ -170,7 +170,7 @@ module Stream =
     | Cons (x, xs) -> Cons (f x, map f xs)
     | Thunk zzz    -> from_fun (fun () -> map f @@ zzz ())
     | Waiting ss   ->
-      let helper {zz} as s = {s with zz = fun () -> map f (zz ())} in
+      let helper ({zz} as s) = {s with zz = fun () -> map f (zz ())} in
       Waiting (List.map helper ss)
 
     let rec iter f s =
@@ -216,9 +216,11 @@ module Stream =
   end
 ;;
 
-@type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a
+(* with show, gmap, html, eq, compare, foldl, foldr *)
+[@@deriving gt ~options:{show;gmap;html;eq;compare;foldl;foldr}]
 
 let logic = {logic with
   gcata = ();
@@ -232,7 +234,7 @@ let logic = {logic with
       method foldr     = logic.plugins#foldr
       method show fa x =
         GT.transform(logic)
-          (fun fself -> object inherit ['a,_] @logic[show] (GT.lift fa) fself
+          (fun fself -> object inherit ['a,_] show_logic_t (GT.lift fa) fself
              method c_Var _ s i cs =
                let c = match cs with
                | [] -> ""
@@ -1822,7 +1824,7 @@ module Table :
           with Not_found -> false
 
         let consume (cache, _) args =
-          let open State in fun {env; subst; scope} as st ->
+          let open State in fun ({env; subst; scope} as st) ->
           let st = State.new_scope st in
           (* [helper iter seen] consumes answer terms from cache one by one
            *   until [iter] (i.e. current pointer into cache list) is not equal to [seen]
@@ -1867,7 +1869,7 @@ module Table :
 
     let make_answ args st =
       let env = Env.create ~anchor:Var.tabling_env in
-      let [answ] = State.reify args st in
+      let answ = List.hd @@ State.reify args st in
       Answer.lift env answ
 
     let create () = H.create 1031
@@ -1906,7 +1908,7 @@ module Tabling =
       let sc = (Curry.succ : (('a -> 'b) -> 'c) -> ((((_, _) injected as 'k) * 'a -> 'b) -> 'k -> 'c)) in
       (sc currier, Uncurry.succ uncurrier)
 
-    let one () = ((Curry.(one) : ((_, _) injected -> _) as 'x -> 'x), Uncurry.one)
+    let one () = ((Curry.(one) : (((_, _) injected -> _) as 'x) -> 'x), Uncurry.one)
 
     let two   () = succ one ()
     let three () = succ two ()
