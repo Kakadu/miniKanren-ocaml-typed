@@ -28,8 +28,13 @@ lib:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
-	$(OB) -Is src ppx/ppx_repr_bin.cmxa ppx/pa_minikanren_bin.cmxa \
-	  ppx/ppx_ocanren_all.cma ppx/ppx_ocanren_all.cmxa ppx/ppx_ocanren_all.cmxs \
+	$(OB) -Is src \
+		ppx/ppx_repr.cmx \
+		ppx/ppx_repr.cmxa \
+		ppx/ppx_repr_bin.native \
+		ppx/smart_logger.cmx  \
+		ppx/pa_minikanren_bin.cmxa \
+		ppx/ppx_ocanren_all.cma ppx/ppx_ocanren_all.cmxa ppx/ppx_ocanren_all.cmxs \
 		ppx/ppx_ocanren_all.native
 
 plugin:

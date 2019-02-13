@@ -1,15 +1,20 @@
-open Migrate_parsetree
-open Ast_405
-module Ast_convenience = Ast_convenience_405
-
 open Printf
-open Ast_mapper
-open Ast_helper
-open Asttypes
-open Parsetree
-open Longident
+open Ppxlib
+open Ppxlib.Ast_helper
+open Ocaml_common.Ast_mapper
+(* open Migrate_parsetree
+ * open Ast_405
+ * module Ast_convenience = Ast_convenience_405 *)
 open StdLabels
-open Ast_convenience
+module Location = Ppxlib.Import_for_core.Location
+
+(* open Ast_mapper *)
+(* open Ast_helper
+ * open Asttypes
+ * open Parsetree
+ * open Longident
+ * open StdLabels
+ * open Ast_convenience *)
 
 module Exp = struct
   include Ast_helper.Exp
@@ -132,7 +137,7 @@ let list_fold_right0 ~f ~initer xs =
   in
   helper (List.rev xs)
 
-let my_list es =
+let my_list ~loc es =
   List.fold_right ~init:[%expr []] es ~f:(fun x acc -> [%expr [%e x] :: [%e acc]])
 
 let parse_to_list alist =
@@ -147,6 +152,7 @@ let parse_to_list alist =
 
 let rec pamk_e ?(need_st=false) mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
+  let loc = e.pexp_loc in
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
   | Pexp_apply (e1,(_,alist)::args) when is_conj_list e1 ->
@@ -160,7 +166,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
 
       let clauses : expression list = parse_to_list alist.pexp_desc in
       [%expr
-        conde [%e Ast_convenience.list @@ List.map (fun e -> pamk_e mapper e) clauses ]
+        conde [%e my_list ~loc @@ List.map (fun e -> pamk_e mapper e) clauses ]
       ]
       (*
       let ans =
@@ -210,7 +216,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
             pamk_e ~need_st:true mapper body
         | body ->
             let xs = List.map (pamk_e ~need_st:false mapper) body in
-            [%expr ?& [%e Ast_convenience.list xs ] st ]
+            [%expr ?& [%e my_list ~loc xs ] st ]
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
@@ -223,7 +229,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   let msg = sprintf "create new variable %s as" ident in
                   let msg = msg ^ " _.%d" in
                   [%expr
-                    let [%p pvar ident ], idx = State.new_var st in
+                    let [%p Pat.var ~loc (Location.mkloc ident loc) ], idx = State.new_var st in
                     mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
                     [%e acc]
                   ]
@@ -248,12 +254,11 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       then [%expr [%e ans] st]
       else ans
   | Pexp_apply (d, body) when is_unif d ->
-
       let loc_str =
         let b = Buffer.create 10 in
         let fmt = Format.formatter_of_buffer b in
         Location.print_compact fmt e.pexp_loc;
-        Format.pp_flush_formatter fmt;
+        Format.pp_print_flush fmt ();
         Buffer.contents b
       in
       (* let ans = e in *)
@@ -289,9 +294,10 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
   (* TODO: support all cases *)
   | _ -> e
 
-
 let pa_minikanren =
-  { default_mapper with expr = fun mapper e -> pamk_e mapper e
-  }
+  { default_mapper with expr = fun mapper e -> pamk_e mapper e }
 
-let register () = Driver.register ~name:"pa_minikanren" Versions.ocaml_405 (fun _ _ -> pa_minikanren)
+let () =
+  Driver.register_transformation
+    ~impl:(fun s -> pa_minikanren.structure pa_minikanren s)
+    "pa_minikanren"

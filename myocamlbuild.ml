@@ -17,7 +17,7 @@ let () = dispatch (function
      flag ["compile"; "use_time_log"]
        (S [ A"-package"; A"logger.syntax"; A"-ppopt";A"-LOG"]);
 
-     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]); 
+     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]);
      (* flag ["compile"; "link_minikanren"] *)
      (*   (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" *)
      (*      ; A"-ppopt";A"-L";A"-ppopt";A"plugin" *)
@@ -60,6 +60,23 @@ let () = dispatch (function
      flag ["compile"; "short_paths"] & S [A "-short-paths"];
      flag ["compile"; "backtrack"] & S [A "-backtrack"];
 
-   ()
+     dep ["ppx/pp_ocanren_all.native"]        ["ppx/smart_logger.cmx"];
+     flag ["flg_linkall"; "compile"] & S [A "-linkall"];
+
+     (* flag ["make_pp_ocanren"; "link"; "byte"] @@
+      * S ([ A"ppx/ppx_deriving_gt.cma"; A"-package"; A"ppxlib" ]); *)
+     flag ["make_pp_ocanren"; "link"; "native"] @@
+     S ([ A"-I"; A"ppx"
+        ; A"ppx/ppx_repr.cmxa"
+        ; A"ppx/smart_logger.cmx"
+        ; A"-package"; A"ppxlib" ]);
+
+
+     flag ["make_pp_repr"; "link"; "native"] @@
+     S ([ A"-I"; A"ppx"
+        ; A"ppx/ppx_repr.cmxa"
+        ; A"-package"; A"ppxlib"
+        ]);
+     ()
  | _ -> ()
 )
