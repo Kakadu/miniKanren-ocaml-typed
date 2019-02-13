@@ -91,7 +91,7 @@ type goal = State.t Stream.t goal'
 type 'a logic = private
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a
-[@@deriving gt {show; gmap}]
+[@@deriving gt ~options:{show; gmap}]
 (* with show, gmap, html, eq, compare, foldl, foldr *)
 
 (** GT-compatible typeinfo for logics *)
