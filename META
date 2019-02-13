@@ -5,14 +5,20 @@ archive(byte) = "MiniKanren.cma"
 archive(native) = "MiniKanren.cmxa"
 
 package "ppx" (
-  description = "PPX syntax extensionon top of ppx_deriving"
-  #requires(-ppx_driver) = "ppx_deriving"
+  description = "PPX syntax extension on top of ppxlib"
+
   ppx = "./ppx_ocanren_all.native --as-ppx"
-  #requires(ppx_driver) = "ppx_deriving.api"
   archive(ppx_driver, byte) = "ppx_ocanren_all.cma"
   archive(ppx_driver, native) = "ppx_ocanren_all.cmxa"
   exists_if = "ppx_ocanren_all.cmxs"
+
+  # This line makes things transparent for people mixing preprocessors
+  # and normal dependencies
+  requires(-ppx_driver) = ""
+  ppx(-ppx_driver,-custom_ppx) = "./ppx_ocanren_all.native --as-ppx"
 )
+
+# TODO: rewrite repr package
 package "repr" (
   description = ""
   requires(-ppx_driver) = "ppx_deriving"

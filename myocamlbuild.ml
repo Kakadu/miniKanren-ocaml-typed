@@ -59,24 +59,32 @@ let () = dispatch (function
 
      flag ["compile"; "short_paths"] & S [A "-short-paths"];
      flag ["compile"; "backtrack"] & S [A "-backtrack"];
-
+(* (* These two lines doens't affect anything *)
      dep ["ppx/pp_ocanren_all.native"]        ["ppx/smart_logger.cmx"];
+     dep ["ppx/ppx_fresh_bin.native"]         ["ppx/ppx_fresh.cmx"];
+*)
      flag ["flg_linkall"; "compile"] & S [A "-linkall"];
 
      (* flag ["make_pp_ocanren"; "link"; "byte"] @@
       * S ([ A"ppx/ppx_deriving_gt.cma"; A"-package"; A"ppxlib" ]); *)
-     flag ["make_pp_ocanren"; "link"; "native"] @@
+     flag ["make_pp_fresh"; "link"; "native"] @@
      S ([ A"-I"; A"ppx"
-        ; A"ppx/ppx_repr.cmxa"
-        ; A"ppx/smart_logger.cmx"
+        ; A"ppx/ppx_fresh.cmx"
         ; A"-package"; A"ppxlib" ]);
-
 
      flag ["make_pp_repr"; "link"; "native"] @@
      S ([ A"-I"; A"ppx"
-        ; A"ppx/ppx_repr.cmxa"
+        ; A"ppx/ppx_repr.cmx"
         ; A"-package"; A"ppxlib"
         ]);
+
+     flag ["make_pp_ocanren"; "link"; "native"] @@
+     S ([ A"-I"; A"ppx"
+        ; A"ppx/ppx_repr.cmx"
+        ; A"ppx/ppx_fresh.cmx"
+        ; A"-package"; A"ppxlib" ]);
+     (* TODO: support smart logger here but for now it is not very useful
+     *)
      ()
  | _ -> ()
 )
