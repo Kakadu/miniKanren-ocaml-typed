@@ -388,6 +388,7 @@ module Term :
          (t >= Obj.first_non_constant_constructor_tag)
       then true
       else false
+      [@@inline]
 
     let is_int = (=) Obj.int_tag
     let is_str = (=) Obj.string_tag
@@ -499,14 +500,13 @@ module Term :
         | false, true   -> fk init R (Obj.magic y) x
         | false, false  ->
           if (tx = ty) && (sx = sy) then
-            let fx, fy = Obj.field x, Obj.field y in
-            let rec inner i acc =
+            let rec inner ~fvar ~fval ~fk x y sx i acc =
               if i < sx then
-                let acc = fold2 ~fvar ~fval ~fk ~init:acc (fx i) (fy i) in
-                inner (i+1) acc
+                let acc = fold2 ~fvar ~fval ~fk ~init:acc (Obj.field x i) (Obj.field y i) in
+                inner ~fvar ~fval ~fk x y sx (i+1) acc
               else acc
             in
-            inner 0 init
+            inner ~fvar ~fval ~fk x y sx 0 init
           else raise (Different_shape (tx, ty))
         end
       | true, false ->
