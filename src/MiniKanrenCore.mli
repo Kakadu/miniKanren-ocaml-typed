@@ -477,3 +477,6 @@ include MiniKanrenTypes.Fmaps with type ('a,'b) inj = ('a,'b) injected
 val reify : Env.t -> ('a, 'a logic) injected -> 'a logic
 
 val prjc : (int -> 'a list -> 'a) -> Env.t -> ('a, 'a logic) injected -> 'a
+
+(* val clear_counters : unit -> unit
+ * val report_counters : unit -> unit *)

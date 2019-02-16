@@ -222,8 +222,8 @@ type 'a logic =
 (* with show, gmap, html, eq, compare, foldl, foldr *)
 [@@deriving gt ~options:{show;gmap;html;eq;compare;foldl;foldr}]
 
-let logic = {logic with
-  gcata = ();
+let logic = {
+  GT.gcata = ();
   plugins =
     object
       method gmap      = logic.plugins#gmap
@@ -1492,7 +1492,13 @@ type goal = State.t Stream.t goal'
 let success st = Stream.single st
 let failure _  = Stream.nil
 
+(* let counter = ref 0
+ * let clear_counters () =  counter := 0
+ * let report_counters () =
+ *   printf "total unifications : %d\n%!" !counter *)
+
 let (===) x y st =
+  (* incr counter; *)
   match State.unify x y st with
   | Some st -> success st
   | None    -> failure st
@@ -2108,7 +2114,4 @@ let diseqtrace shower x y = fun st ->
   else  printfn "  +"; *)
   ans;;
 
-(* ***************************** a la relational StdLib here ***************  *)
-
-let report_counters () = ()
 *)
