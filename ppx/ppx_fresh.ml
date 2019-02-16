@@ -140,7 +140,9 @@ let rec pamk_e mapper e : expression =
                          pamk_e mapper body
                        | body ->
                          let xs = List.map (pamk_e mapper) body in
-                         [%expr ?& [%e my_list ~loc xs ] ]
+                         list_fold_right0 ~initer:(fun x -> x) xs ~f:(fun x acc ->
+                             [%expr [%e x] &&& [%e acc] ]
+                           )
                      ])]
       in
       match reconstruct_args args with
