@@ -85,6 +85,11 @@ let () = dispatch (function
         ; A"-package"; A"ppxlib" ]);
      (* TODO: support smart logger here but for now it is not very useful
      *)
+
+     flag ["compile";"c"] (S[A"-ccopt"; A"-Wall"; A"-ccopt"; A"-O3"  ]);
+     dep  ["use_lib_unify"] [ "src/libunify.a" ];
+     flag ["ocaml";"link";"native";"use_lib_unify"] (S[A"src/libunify.a"]);
+
      ()
  | _ -> ()
 )

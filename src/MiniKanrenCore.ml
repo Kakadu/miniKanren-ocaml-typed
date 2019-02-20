@@ -18,6 +18,20 @@
 
 open Printf
 
+module Timings = struct
+  type t = { mutable whole_time: float; mutable unif_time: float; enabled: bool}
+  let make ~enabled = { whole_time=0.0; unif_time=0.0; enabled }
+  let unif  {unif_time}  = unif_time
+  let whole {whole_time} = whole_time
+  let is_enabled {enabled} = enabled
+  let set_whole_time t ~time =
+    t.whole_time <- time;
+    t
+  let set_unif_time t ~time =
+    t.unif_time <- time;
+    t
+end
+
 module Log =
   struct
 
@@ -265,6 +279,8 @@ module Var =
       fun () -> (incr scope; !scope)
 
     let global_anchor = [-8]
+    let register_global_anchor () =
+      Callback.register "global_anchor" global_anchor
 
     type t = {
       anchor        : anchor;
@@ -691,6 +707,10 @@ module Subst :
      *)
     val unify : ?subsume:bool -> ?scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (Binding.t list * t) option
 
+    external unify_in_c : subsume:bool -> scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (Binding.t list * t) option = "caml_unify_in_c_byte" "caml_unify_in_c"
+
+    val register_externs : unit -> unit
+
     val merge_disjoint : Env.t -> t -> t -> t
 
     (* [merge env s1 s2] merges two substituions *)
@@ -729,6 +749,15 @@ module Subst :
     let split s = VarMap.fold (fun var term xs -> Binding.({var; term})::xs) s []
 
     type lterm = Var of Var.t | Value of Term.t
+
+    let register_externs () =
+      let lookup subst idx = VarMap.find idx subst in
+      let extend idx var term subst =
+        VarMap.add idx term subst
+      in
+      Callback.register "Subst.lookup" lookup;
+      Callback.register "Subst.extend" extend
+
 
     let rec walk env subst x =
       (* walk var *)
@@ -806,6 +835,10 @@ module Subst :
 
     exception Unification_failed
 
+    (* N.B. Fuck the scopes *)
+    external unify_in_c : subsume:bool -> scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (Binding.t list * t) option = "caml_unify_in_c_byte"  "caml_unify_in_c"
+
+(*
     let unify ?(subsume=false) ?(scope=Var.non_local_scope) env subst x y =
       (* The idea is to do the unification and collect the unification prefix during the process *)
       let extend var term (prefix, subst) =
@@ -838,6 +871,11 @@ module Subst :
         let x, y = Term.(repr x, repr y) in
         Some (helper x y ([], subst))
       with Term.Different_shape _ | Unification_failed | Occurs_check -> None
+                  *)
+
+    let unify ?(subsume=false) ?(scope=Var.non_local_scope) =
+      unify_in_c ~subsume ~scope
+
 
     let apply env subst x = Obj.magic @@
       map env subst (Term.repr x)
@@ -1934,3 +1972,11 @@ module Tabling =
       g := currier g_tabled;
       !g
 end
+
+external unify_preload_stuff: unit -> unit = "caml_unify_preload_stuff"
+
+let () =
+  Var.register_global_anchor ();
+  Subst.register_externs ();
+  unify_preload_stuff ();
+  ()

@@ -25,7 +25,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 all: bundle samples
 bundle: lib plugin
 lib:
-	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
+	$(OB) -Is src src/libunify.a $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
 	$(OB) -Is src \
@@ -129,6 +129,8 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cmx \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
+  _build/src/libunify.a \
+  _build/src/dllunify.so \
 	$(wildcard _build/ppx/ppx_ocanren_all.cma) \
 	$(wildcard _build/ppx/ppx_ocanren_all.cmxa) \
 	$(wildcard _build/ppx/ppx_ocanren_all.cmxs) \
