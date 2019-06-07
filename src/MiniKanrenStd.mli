@@ -57,7 +57,8 @@ module Pair :
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) ground;
          html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer;
-         show    : ('a -> string) -> ('b -> string) -> ('a, 'b) ground -> string >)
+         show    : ('a -> string) -> ('b -> string) -> ('a, 'b) ground -> string >,
+      int)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
@@ -69,7 +70,8 @@ module Pair :
          foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
          gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) logic -> ('c, 'd) logic;
          html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer;
-         show    : ('a -> string) -> ('b -> string) -> ('a, 'b) logic -> string >)
+         show    : ('a -> string) -> ('b -> string) -> ('a, 'b) logic -> string >,
+      int)
       GT.t
 
     (** Logic injection (for reification) *)
@@ -111,7 +113,8 @@ module Option :
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
          gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
          html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
-         show    : ('a -> string) -> 'a ground -> string >)
+         show    : ('a -> string) -> 'a ground -> string >,
+      int)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
@@ -123,7 +126,7 @@ module Option :
          foldr   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
          gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
-         show    : ('a -> string) -> 'a logic -> string >)
+         show    : ('a -> string) -> 'a logic -> string >, int)
       GT.t
 
     (** Logic injection (for reification) *)
@@ -168,7 +171,7 @@ module Bool :
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
          html    : ground -> HTML.viewer;
-         show    : ground -> string >)
+         show    : ground -> string >, int)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
@@ -180,7 +183,7 @@ module Bool :
          foldr   : 'a -> logic -> 'a;
          gmap    : logic -> logic;
          html    : logic -> HTML.viewer;
-         show    : logic -> string >)
+         show    : logic -> string >, int)
       GT.t
 
     (** Logic injection (for reification) *)
@@ -248,7 +251,7 @@ module Nat :
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
          html    : ground -> HTML.viewer;
-         show    : ground -> string >)
+         show    : ground -> string >, int)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)

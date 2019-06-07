@@ -102,7 +102,8 @@ val logic :
      foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
-   >) GT.t
+   >,
+  int) GT.t
 
 (** [to_logic x] makes a logic value from a regular one *)
 val to_logic : 'a -> 'a logic
