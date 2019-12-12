@@ -15,13 +15,6 @@ let leaf s = eConstr !!s @@ Std.List.nil ()
 (* let z = eConstr !!"z" @@ Std.List.nil () *)
 let pair a b = eConstr !!"pair" (Std.List.list [a;b])
 
-(* let rec nat_reifier env n =
-  For_gnat.reify nat_reifier env n
-
-let rec match_reifier env x =
-  For_gmatchable.reify nat_reifier match_reifier env x *)
-
-
 module Pattern = struct
   type ground = (string, ground Std.List.ground) gpattern
   type logic = (string OCanren.logic, logic Std.List.logic) gpattern OCanren.logic
@@ -41,17 +34,22 @@ module Pattern = struct
   let show p =
     let rec helper = function
     | WildCard -> "_"
+    | PConstr (s, Std.List.Nil) -> Printf.sprintf "(%s)" s
     | PConstr (s, ps) ->
       Printf.sprintf "(%s %s)" s (GT.show Std.List.ground helper ps)
     in
     helper p
 
-  let rec show_logic p =
+  let rec show_logic (p: logic) =
     let rec helper = function
     | WildCard -> "_"
+    | PConstr (s, OCanren.Value Std.List.Nil) ->
+        GT.show OCanren.logic (GT.show GT.string) s
     | PConstr (s, ps) ->
       Printf.sprintf "(%s %s)"
-        (GT.show GT.string s)
+        (match s with
+          | OCanren.Value s -> s
+          | s -> GT.show OCanren.logic (GT.show GT.string) s)
         (GT.show Std.List.logic show_logic ps)
     in
     GT.show OCanren.logic helper p
@@ -99,6 +97,7 @@ module Expr = struct
 
   let rec show x =
     match x with
+    | EConstr (s, Std.List.Nil) -> Printf.sprintf "(%s)" s
     | EConstr (s, xs) ->
       Printf.sprintf "(%s %s)"
         (GT.show GT.string s)
@@ -145,22 +144,32 @@ let generate_demo_exprs pats =
   in
   List.iter (fun p -> Printf.printf "%s, " (Expr.show p)) height1;
 
-  (* let rec populate_lists length orig =
+  let rec populate_lists length (orig: Expr.ground list) : Expr.ground list list =
     let rec helper n =
-      if n<1 then failwith "bad argument"
-      else if n=1 then orig
+      if n<1 then failwith (Printf.sprintf "populate_list: bad argument %d" n)
+      else if n=1 then [orig]
       else
         let prevs = helper (n-1) in
-        List.concat_map (fun tl -> List.map (fun h -> h::tl) orig) prevs
+        List.flatten @@
+        List.map (fun tl -> List.map (fun h -> h::tl) orig) prevs
     in
     helper length
-  in *)
-  let rec builder acc curh =
-    if curh > height
-    then acc
-    else acc (* TODO *)
   in
-  height1
+  let rec builder (prev: 'a list) curh : Expr.ground list =
+    if curh > height
+    then prev
+    else
+      Pattern.ArityMap.to_seq arity_map
+      |> Seq.flat_map (fun (name,arity) ->
+          if arity = 0 then Seq.return @@ Expr.econstr name []
+          else
+            List.to_seq @@
+            List.map (fun xs -> Expr.econstr name @@  xs) @@
+            populate_lists arity prev
+      )
+      |> List.of_seq
+  in
+  builder height1 (1+1)
 
 let checkAnswer q c r = eval_ir ((===) q) ((===) c) r
 
@@ -388,7 +397,7 @@ let () =
 
   let injected_exprs =
     let demo_exprs = generate_demo_exprs @@ List.map fst patterns2 in
-    Printf.printf "%s\n%!" @@ GT.show GT.list Expr.show demo_exprs;
+    Printf.printf "\ndemo expressions:%! %s\n%!" @@ GT.show GT.list Expr.show demo_exprs;
     List.map Expr.inject demo_exprs
   in
   print_newline ();
