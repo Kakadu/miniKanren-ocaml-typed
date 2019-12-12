@@ -33,6 +33,7 @@ open Core
 (** Logic option *)
 @type ('a, 'b) logic = ('a * 'b) logic' with show, gmap, html, eq, compare, foldl, foldr
 
+
 (** Logic injection (for reification) *)
 val inj : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) logic
 

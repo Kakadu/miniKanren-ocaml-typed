@@ -38,6 +38,26 @@ module Pattern = struct
   let ground_list_length xs =
     GT.foldl Std.List.ground (fun acc _ -> acc+1) 0 xs
 
+  let show p =
+    let rec helper = function
+    | WildCard -> "_"
+    | PConstr (s, ps) ->
+      Printf.sprintf "(%s %s)" s (GT.show Std.List.ground helper ps)
+    in
+    helper p
+
+  let rec show_logic p =
+    let rec helper = function
+    | WildCard -> "_"
+    | PConstr (s, ps) ->
+      Printf.sprintf "(%s %s)"
+        (GT.show GT.string s)
+        (GT.show Std.List.logic show_logic ps)
+    in
+    GT.show OCanren.logic helper p
+
+
+
   module ArityMap = Map.Make(Base.String)
   exception Bad
 
@@ -58,6 +78,16 @@ module Pattern = struct
     try Some (helper ArityMap.empty pat)
     with Bad -> None
 end
+
+(* TODO: put this to stdlib *)
+let rec inject_ground_list ps =
+  (* TODO: tail recursion *)
+  let rec helper = function
+  | Std.List.Nil -> Std.List.nil ()
+  | Std.List.Cons (x, xs) -> Std.List.cons x (helper xs)
+  in
+  helper ps
+
 
 module Expr = struct
   type ground = (string, ground Std.List.ground) gexpr
@@ -87,6 +117,12 @@ module Expr = struct
   let rec reify env x =
     For_gexpr.reify OCanren.reify (Std.List.reify reify) env x
 
+let inject (e: ground) : injected =
+  let rec helper = function
+  | EConstr (s,xs) ->
+      constr !!s (inject_ground_list @@ GT.gmap Std.List.ground helper xs)
+  in
+  helper e
 end
 
 let generate_demo_exprs pats =
@@ -109,21 +145,22 @@ let generate_demo_exprs pats =
   in
   List.iter (fun p -> Printf.printf "%s, " (Expr.show p)) height1;
 
-  let rec populate_lists length orig =
+  (* let rec populate_lists length orig =
     let rec helper n =
       if n<1 then failwith "bad argument"
       else if n=1 then orig
       else
         let prevs = helper (n-1) in
-        List.concat_map (fun tl -> List.map (fun h -> h::tl) orig) prevs 
+        List.concat_map (fun tl -> List.map (fun h -> h::tl) orig) prevs
     in
     helper length
-  in
+  in *)
   let rec builder acc curh =
     if curh > height
     then acc
-    else
-  ()
+    else acc (* TODO *)
+  in
+  height1
 
 let checkAnswer q c r = eval_ir ((===) q) ((===) c) r
 
@@ -208,21 +245,22 @@ end
 module Matchable = struct
   type ground = (Nat.ground, ground) gmatchable
   type logic = (Nat.logic, logic) gmatchable OCanren.logic
+  type injected = (ground, logic) OCanren.injected
 
   let scru = scru
   let field = field
   let rec reify env x =
     For_gmatchable.reify Nat.reify reify env x
 
-  let rec show_match_logic x =
+  let rec show_logic x =
     let rec helper = function
     | Scru          -> "Scru"
     | Field (n,r) ->
-      Printf.sprintf "Field (_,%s)" (show_match_logic r)
+      Printf.sprintf "Field (_,%s)" (show_logic r)
     in
     GT.show OCanren.logic helper x
 
-  let show_match x =
+  let show x =
     let rec helper = function
     | Scru        -> "Scru"
     | Field (n,r) -> Printf.sprintf "Field (_,%s)" (helper r)
@@ -232,24 +270,49 @@ module Matchable = struct
 end
 
 module IR = struct
-  type ground = (string, Matchable.ground, ground, ground) gir
-  type logic = (string OCanren.logic, Matchable.logic, logic, logic) gir OCanren.logic
+  type ground = (string, Matchable.ground, ground, int) gir
+  type logic = (string OCanren.logic, Matchable.logic, logic, int OCanren.logic) gir OCanren.logic
+  type injected = (ground, logic) OCanren.injected
 
   let fail = fail
   let iftag = iFTag
   let int = int
 
+  let eint n = Int n
+
   let rec reify env x =
-    For_gir.reify OCanren.reify Matchable.reify reify reify env x
+    For_gir.reify OCanren.reify Matchable.reify reify OCanren.reify env x
+
+  let inject e =
+    let rec helper = function
+    | Int n -> int !!n
+    | _ -> failwith "not implemented"
+    in
+    helper e
 
   let show e =
     let rec helper = function
-    | _ -> Printf.sprintf "<ground ir>"
+    | Fail -> "(fail)"
+    | Int n -> string_of_int n
+    | IFTag (str, m, th_, el_) ->
+      Printf.sprintf "(iftag %S %s %s %s)"
+        str
+        (Matchable.show m)
+        (helper th_)
+        (helper el_)
     in
     helper e
 
   let rec show_logic e =
     let rec helper = function
+    | Fail -> "(fail)"
+    | Int ln -> GT.show OCanren.logic (GT.show GT.int) ln
+    | IFTag (ltag, m, th_, el_) ->
+      Printf.sprintf "(iftag %s %s %s %s)"
+        (GT.show OCanren.logic (GT.show GT.string) ltag)
+        (Matchable.show_logic m)
+        (show_logic th_)
+        (show_logic el_)
     | _ -> Printf.sprintf "<logic ir>"
     in
     GT.show OCanren.logic helper e
@@ -276,7 +339,75 @@ end
     q qh ("answers", make_expr_generator patterns1)
 
   () *)
+module Clauses = struct
+  type ground = (Pattern.ground * IR.ground) Std.List.ground
+  type logic = (Pattern.logic, IR.logic) Std.Pair.logic Std.List.logic
+  type injected = (ground, logic) OCanren.injected
+end
+
+
+let inject_patterns ps =
+  let rec one : Pattern.ground -> _ = function
+  | WildCard -> Pattern.wc ()
+  | PConstr (name,ps) ->
+      Pattern.constr !!name @@
+      (inject_ground_list @@ GT.gmap Std.List.ground one ps)
+  in
+
+  Std.List.list @@
+  List.map (fun (p,rhs) -> Std.Pair.pair (one p) (IR.inject rhs)) ps
+
+let eval_pat :
+  Expr.injected ->
+  Clauses.injected ->
+  (IR.ground option, IR.logic Std.Option.logic) OCanren.injected ->
+  goal
+  = fun expr_scru pats res -> eval_pat ((===)expr_scru) ((===)pats) res
+
+let eval_ir :
+  Expr.injected ->
+  IR.injected ->
+  (int option, int OCanren.logic Std.Option.logic) OCanren.injected ->
+  goal
+  = fun s ir res -> eval_ir ((===)s) ((===)ir) res
+
 
 let () =
-  let () = generate_demo_exprs patterns1 in
+  let patterns2 : (Pattern.ground * IR.ground) list =
+    (* [ ppair pnil pwc, IR.eint 1
+    ; ppair pwc  pnil, IR.eint 2
+    ; ppair (pcons pwc pwc) (pcons pwc pwc), IR.eint 3
+    ] *)
+    [ ppair pnil pwc,  IR.eint 1
+    ; ppair pwc  pnil, IR.eint 2
+    ; ppair pnil pnil, IR.eint 3
+    ]
+
+  in
+  let injected_pats = inject_patterns patterns2 in
+
+  let injected_exprs =
+    let demo_exprs = generate_demo_exprs @@ List.map fst patterns2 in
+    Printf.printf "%s\n%!" @@ GT.show GT.list Expr.show demo_exprs;
+    List.map Expr.inject demo_exprs
+  in
+  print_newline ();
+
+
+  runR IR.reify IR.show IR.show_logic 10
+    q qh ("ideal_IR", fun ideal_IR ->
+      List.fold_left (fun acc (scru: Expr.injected) ->
+        fresh (res_pat res_ir)
+          acc
+          (eval_pat scru injected_pats res_pat)
+          (eval_ir  scru ideal_IR      res_ir)
+          (conde
+            [ (res_pat === Std.Option.none ()) &&& (res_ir === Std.Option.none())
+            ; fresh (n)
+                (res_pat === Std.Option.some (IR.int n))
+                (res_ir  === Std.Option.some n)
+            ])
+      ) success injected_exprs
+    );
+
   ()
