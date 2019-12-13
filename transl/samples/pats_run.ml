@@ -405,6 +405,13 @@ let () =
 
   runR IR.reify IR.show IR.show_logic 10
     q qh ("ideal_IR", fun ideal_IR ->
+
+      let init =
+        fresh (hack1 hack2)
+          success
+          (ideal_IR === IR.iftag !!"pair" (Matchable.scru ()) hack1 hack2)
+      in
+
       List.fold_left (fun acc (scru: Expr.injected) ->
         fresh (res_pat res_ir)
           acc
@@ -416,7 +423,7 @@ let () =
                 (res_pat === Std.Option.some (IR.int n))
                 (res_ir  === Std.Option.some n)
             ])
-      ) success injected_exprs
+      ) init injected_exprs
     );
 
   ()
