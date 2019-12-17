@@ -95,13 +95,21 @@ module Expr = struct
   let constr = eConstr
   let econstr s xs = EConstr (s, Std.List.of_list id xs)
 
-  let rec show x =
-    match x with
-    | EConstr (s, Std.List.Nil) -> Printf.sprintf "(%s)" s
-    | EConstr (s, xs) ->
+  let show x =
+    let rec helper pars x =
+     match x with
+    | EConstr (s, Std.List.Nil) when pars -> Printf.sprintf "(%s)" s
+    | EConstr (s, Std.List.Nil)           -> s
+    | EConstr (s, xs) when pars ->
       Printf.sprintf "(%s %s)"
         (GT.show GT.string s)
-        (GT.show Std.List.ground show xs)
+        (GT.show Std.List.ground (helper false) xs)
+    | EConstr (s, xs) ->
+      Printf.sprintf "%s %s"
+        (GT.show GT.string s)
+        (GT.show Std.List.ground (helper false) xs)
+    in
+    helper false x
 
   let rec show_logic x =
     let rec helper x =
@@ -124,6 +132,12 @@ let inject (e: ground) : injected =
   helper e
 end
 
+let print_demos msg xs =
+  Printf.printf "<%s>\n" msg;
+  List.iter (fun p -> Printf.printf "\t\t%s\n" (Expr.show p)) xs;
+  Printf.printf "</%s>\n" msg
+
+
 let generate_demo_exprs pats =
   let height = List.fold_left
     (fun acc p -> max acc (Pattern.height p)) 0 pats in
@@ -142,19 +156,33 @@ let generate_demo_exprs pats =
       (Expr.econstr k @@ List.init arity (fun _ -> dummy)) :: acc
     ) arity_map []
   in
-  List.iter (fun p -> Printf.printf "%s, " (Expr.show p)) height1;
+  let () = print_demos "height1" height1 in
 
-  let rec populate_lists length (orig: Expr.ground list) : Expr.ground list list =
+  (* let rec populate_lists length (orig: 'a list) : 'a list list =
+    Printf.printf "populate_lists length=%d\n%!" length;
     let rec helper n =
       if n<1 then failwith (Printf.sprintf "populate_list: bad argument %d" n)
       else if n=1 then [orig]
       else
         let prevs = helper (n-1) in
+        List.iter (fun xs -> assert (length = (List.length xs))) prevs;
         List.flatten @@
         List.map (fun tl -> List.map (fun h -> h::tl) orig) prevs
     in
-    helper length
+    let ans = helper length in
+    List.iter (fun xs -> assert (length = (List.length xs))) ans;
+    ans
+  in *)
+
+
+  let rec populate_lists : int -> 'a list -> 'a list list = fun n init ->
+    if n<1 then assert false
+    else if n = 1 then List.map (fun h -> [h]) init
+    else
+      List.flatten @@ List.map (fun xs -> List.map (fun h -> h::xs) init) @@
+      populate_lists (n-1) init
   in
+
   let rec builder (prev: 'a list) curh : Expr.ground list =
     if curh > height
     then prev
@@ -327,27 +355,7 @@ module IR = struct
     GT.show OCanren.logic helper e
 end
 
-(* let _ =
-  let pats = patterns1 in
-  let all_exprs =
-   let generator = make_expr_generator @@ List.map id patterns1 in
-   let es_logic = run one generator (fun r -> r#reify Expr.reify)
-     |> OCanren.Stream.take ~n:(2)
-     |> List.map Expr.inject
-   in
-   (* let es_logic =
-     if List.length es_logic > 2
-     then List.take es_logic 2
-     else es_logic
-   in *)
-   es_logic
- in
 
-  (* final stuff *)
-  runR IR.reify IR.show IR.show_logic 10
-    q qh ("answers", make_expr_generator patterns1)
-
-  () *)
 module Clauses = struct
   type ground = (Pattern.ground * IR.ground) Std.List.ground
   type logic = (Pattern.logic, IR.logic) Std.Pair.logic Std.List.logic
@@ -398,6 +406,17 @@ let () =
   let injected_exprs =
     let demo_exprs = generate_demo_exprs @@ List.map fst patterns2 in
     Printf.printf "\ndemo expressions:%! %s\n%!" @@ GT.show GT.list Expr.show demo_exprs;
+    print_demos "demo_exprs" demo_exprs;
+
+    demo_exprs |> List.iter (fun e ->
+        runR (Std.Option.reify IR.reify)
+             (GT.show Std.Option.ground IR.show)
+             (GT.show Std.Option.logic IR.show_logic)
+          1 q qh (Printf.sprintf "test_demo: `%s`" (Expr.show e), fun ir ->
+            eval_pat (Expr.inject e) injected_pats (ir)
+        )
+      );
+
     List.map Expr.inject demo_exprs
   in
   print_newline ();
@@ -418,10 +437,10 @@ let () =
           (eval_pat scru injected_pats res_pat)
           (eval_ir  scru ideal_IR      res_ir)
           (conde
-            [ (res_pat === Std.Option.none ()) &&& (res_ir === Std.Option.none())
-            ; fresh (n)
+            [ fresh (n)
                 (res_pat === Std.Option.some (IR.int n))
                 (res_ir  === Std.Option.some n)
+            ; (res_pat === Std.Option.none ()) &&& (res_ir === Std.Option.none())
             ])
       ) init injected_exprs
     );
