@@ -277,6 +277,29 @@ module Nat = struct
   let z = z
   let s = s
 
+  let show (n: ground) =
+    let rec helper acc = function
+    | Z -> string_of_int acc
+    | S n -> helper (acc+1) n
+    in
+    helper 0 n
+
+  (* let (_:int) = GT.show OCanren.logic *)
+
+  let show_logic n =
+    let rec helper acc : logic -> string = function
+    | Value Z -> string_of_int acc
+    | Value (S n) -> helper (acc+1) n
+    | (Var _) as n ->
+        if acc <= 0
+        then GT.show OCanren.logic (show_gnat_logic 0) n
+        else Printf.sprintf "(%d+%s)" acc (GT.show OCanren.logic (show_gnat_logic 0) n)
+    and show_gnat_logic acc : logic gnat -> string = function
+    | Z -> string_of_int acc
+    | S n -> helper (acc+1) n
+    in
+    helper 0 n
+
   let rec reify env x = For_gnat.reify reify env x
 end
 module Matchable = struct
@@ -293,14 +316,14 @@ module Matchable = struct
     let rec helper = function
     | Scru          -> "Scru"
     | Field (n,r) ->
-      Printf.sprintf "Field (_,%s)" (show_logic r)
+      Printf.sprintf "(field %s %s)" (Nat.show_logic n) (show_logic r)
     in
     GT.show OCanren.logic helper x
 
   let show x =
     let rec helper = function
     | Scru        -> "Scru"
-    | Field (n,r) -> Printf.sprintf "Field (_,%s)" (helper r)
+    | Field (n,r) -> Printf.sprintf "(field %s %s)" (Nat.show n) (helper r)
     in
     helper x
 
@@ -391,14 +414,14 @@ let eval_ir :
 
 let () =
   let patterns2 : (Pattern.ground * IR.ground) list =
-    (* [ ppair pnil pwc, IR.eint 1
+    [ ppair pnil pwc, IR.eint 1
     ; ppair pwc  pnil, IR.eint 2
     ; ppair (pcons pwc pwc) (pcons pwc pwc), IR.eint 3
-    ] *)
-    [ ppair pnil pwc,  IR.eint 1
+    ]
+    (* [ ppair pnil pwc,  IR.eint 1
     ; ppair pwc  pnil, IR.eint 2
     ; ppair pnil pnil, IR.eint 3
-    ]
+    ] *)
 
   in
   let injected_pats = inject_patterns patterns2 in
@@ -407,6 +430,14 @@ let () =
     let demo_exprs = generate_demo_exprs @@ List.map fst patterns2 in
     Printf.printf "\ndemo expressions:%! %s\n%!" @@ GT.show GT.list Expr.show demo_exprs;
     print_demos "demo_exprs" demo_exprs;
+    let demo_exprs =
+      demo_exprs |> List.filter (fun e ->
+        let open OCanren in
+        run one (fun ir -> eval_pat (Expr.inject e) injected_pats (Std.Option.some ir))
+          (fun r -> r)
+          |> (fun s -> not (OCanren.Stream.is_empty s))
+        )
+    in
 
     demo_exprs |> List.iter (fun e ->
         runR (Std.Option.reify IR.reify)
@@ -428,7 +459,7 @@ let () =
       let init =
         fresh (hack1 hack2)
           success
-          (ideal_IR === IR.iftag !!"pair" (Matchable.scru ()) hack1 hack2)
+          (* (ideal_IR === IR.iftag !!"pair" (Matchable.scru ()) hack1 hack2) *)
       in
 
       List.fold_left (fun acc (scru: Expr.injected) ->
