@@ -43,7 +43,8 @@ compile_transl: lib
 
 transl:
 	# $(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bottles_run.native
-	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/pats_run.native
+	# $(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/pats_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/dpats_run.native
 	# $(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bridge_run.native
 	# $(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/einstein_run.native
 	# $(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/GCW_run.native

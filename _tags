@@ -30,7 +30,10 @@ true: short_paths, warn_error(+5)
 <transl/put_distrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
 <transl/printer_in_spec.*>: package(compiler-libs.common)
 
-<transl/samples/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
+<transl/samples/*>: rectypes
+#, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
+<transl/samples/dpats.*>: package(GT,ocanren.ppx.fresh)
+<transl/samples/dpats_run.*>: package(GT,ocanren.ppx.fresh,GT.ppx)
 
 <transl/samples/hm_inferencer.*>: rectypes, dsource
 <transl/samples/GCW.*>: dsource
