@@ -194,14 +194,14 @@ let (===) x y st =
   | None    -> failure st
 
 let unify = (===)
-          
+
 let (=/=) x y st =
   match State.diseq x y st with
   | Some st -> success st
   | None    -> failure st
 
 let diseq = (=/=)
-          
+
 let delay g st = RStream.from_fun (fun () -> g () st)
 
 let conj f g st = RStream.bind (f st) g
@@ -472,3 +472,30 @@ module Tabling =
       g := currier g_tabled;
       !g
   end
+
+
+let trace1 msg var func st =
+  let answers : Answer.t list = State.reify var st in
+  Format.printf "%s: [" msg;
+  List.iter (fun x ->
+    func Format.std_formatter (Logic.make_rr (State.env st) !!!(Answer.ctr_term x));
+    Format.fprintf Format.std_formatter "; "
+  ) answers;
+  Format.printf "]\n%!";
+  RStream.single st
+
+let trace2 msg var1 var2 func1 func2 st =
+  Format.printf "%s: " msg;
+  let wrap var func =
+    let answers : Answer.t list = State.reify var st in
+    Format.printf "[ ";
+    List.iter (fun x ->
+      func Format.std_formatter (Logic.make_rr (State.env st) !!!(Answer.ctr_term x));
+      Format.fprintf Format.std_formatter "; "
+    ) answers;
+    Format.printf " ]   %!"
+  in
+  wrap var1 func1;
+  wrap var2 func2;
+  Format.printf "\n%!";
+  RStream.single st

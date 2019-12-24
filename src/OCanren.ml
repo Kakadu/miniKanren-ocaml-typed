@@ -60,4 +60,7 @@ module Std =
     let some = Option.some
     let none = Option.none
     let pair = Pair.pair
+
+    let trace1 = Core.trace1
+    let trace2 = Core.trace2
   end

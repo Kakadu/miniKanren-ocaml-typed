@@ -346,3 +346,13 @@ module Tabling :
        ('d -> 'a -> State.t RStream.t goal')) ->
       (('b -> 'c) -> 'd) -> 'b -> 'c
   end
+
+
+val trace1 : string -> ('a,'b) injected ->
+  (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
+  goal
+
+val trace2 : string -> ('a,'b) injected -> ('c,'d) injected ->
+  (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
+  (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
+  goal
