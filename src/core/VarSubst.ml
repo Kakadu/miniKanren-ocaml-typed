@@ -109,9 +109,9 @@ let rec occurs env subst var term =
     ~fvar:(fun v -> if Term.Var.equal v var then raise Occurs_check)
     ~fval:(fun x -> ())
 
-let extend ~scope env subst var term  =
+let extend ~scope ?(occ=true) env subst var term  =
   (* if occurs env subst var term then raise Occurs_check *)
-  occurs env subst var term;
+  if occ then occurs env subst var term;
     (* assert (VarEnv.var env var <> VarEnv.var env term); *)
 
   (* It is safe to modify variables destructively if the case of scopes match.
@@ -131,10 +131,10 @@ let extend ~scope env subst var term  =
 
 exception Unification_failed
 
-let unify ?(subsume=false) ?(scope=Term.Var.non_local_scope) env subst x y =
+let unify ?(occurs=true) ?(subsume=false) ?(scope=Term.Var.non_local_scope) env subst x y =
   (* The idea is to do the unification and collect the unification prefix during the process *)
   let extend var term (prefix, subst) =
-    let subst = extend ~scope env subst var term in
+    let subst = extend ~scope ~occ:occurs env subst var term in
     (Binding.({var; term})::prefix, subst)
   in
   let rec helper x y acc =

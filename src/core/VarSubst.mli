@@ -61,7 +61,7 @@ val freevars : VarEnv.t -> t -> 'a -> Term.VarSet.t
  *   This can be used to perform subsumption check:
  *   [y] is subsumed by [x] (i.e. [x] is more general than [x]) if such a unification succeeds.
  *)
-val unify : ?subsume:bool -> ?scope:Term.Var.scope -> VarEnv.t -> t -> 'a -> 'a -> (Binding.t list * t) option
+val unify : ?occurs:bool -> ?subsume:bool -> ?scope:Term.Var.scope -> VarEnv.t -> t -> 'a -> 'a -> (Binding.t list * t) option
 
 val merge_disjoint : VarEnv.t -> t -> t -> t
 
