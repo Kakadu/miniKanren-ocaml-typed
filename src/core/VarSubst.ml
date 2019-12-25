@@ -16,6 +16,55 @@
  * (enclosed in the file COPYING).
  *)
 
+let (!!!) = Obj.magic
+
+type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
+
+let rec wrap (x : Obj.t) =
+  Obj.(
+    let is_valid_tag =
+      List.fold_left
+      (fun f t tag -> tag <> t && f tag)
+      (fun _ -> true)
+      [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
+       forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
+       final_tag  ; unaligned_tag; out_of_heap_tag
+      ]
+    in
+    let is_unboxed obj =
+      is_int obj ||
+      (fun t -> t = string_tag || t = double_tag) (tag obj)
+    in
+    if is_unboxed x
+    then Unboxed x
+    else
+      let t = tag x in
+      if is_valid_tag t
+      then
+        let f = if t = double_array_tag then !!! double_field else field in
+        Boxed (t, size x, f x)
+      else Invalid t
+    )
+
+let generic_show x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner o =
+    match wrap o with
+    | Invalid n             -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
+    | Unboxed n when !!!n=0 -> Buffer.add_string b "[]"
+    | Unboxed n             -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
+    | Boxed (t,l,f) when t=0 && l=1 && (match wrap (f 0) with Unboxed i when !!!i >=10 -> true | _ -> false) ->
+       Printf.bprintf b "var%d" (match wrap (f 0) with Unboxed i -> !!!i | _ -> failwith "shit")
+
+    | Boxed   (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner x;
+  Buffer.contents b
+
 module Binding =
   struct
     type t =
@@ -111,7 +160,11 @@ let rec occurs env subst var term =
 
 let extend ~scope ?(occ=true) env subst var term  =
   (* if occurs env subst var term then raise Occurs_check *)
-  if occ then occurs env subst var term;
+  let () =
+    if occ 
+    then occurs env subst var term
+    else Printf.printf "\toccurs check disabled\n"
+  in
     (* assert (VarEnv.var env var <> VarEnv.var env term); *)
 
   (* It is safe to modify variables destructively if the case of scopes match.
@@ -153,7 +206,9 @@ let unify ?(occurs=true) ?(subsume=false) ?(scope=Term.Var.non_local_scope) env 
       )
       ~fk:(fun ((_, subst) as acc) l v y ->
           if subsume && (l = Term.R)
-          then raise Unification_failed
+          then 
+            let () = Format.printf "\tFail in subsumption check\n%!" in 
+            raise Unification_failed
           else match walk env subst v with
           | Var v    -> extend v y acc
           | Value x  -> helper x y acc
@@ -162,7 +217,15 @@ let unify ?(occurs=true) ?(subsume=false) ?(scope=Term.Var.non_local_scope) env 
   try
     let x, y = Term.(repr x, repr y) in
     Some (helper x y ([], subst))
-  with Term.Different_shape _ | Unification_failed | Occurs_check -> None
+  with Term.Different_shape _ ->
+       Format.printf "\tunification failed: Different_shape\n%!"; 
+       None
+     | Unification_failed ->  
+       Format.printf "\tunification failed: Unification_failed\n%!"; 
+       None
+     | Occurs_check -> 
+       Format.printf "\tunification failed: Occurs_check\n%!"; 
+       None
 
 let apply env subst x = Obj.magic @@
   map env subst (Term.repr x)
@@ -209,3 +272,4 @@ let reify env subst x =
   map env subst (Term.repr x)
     ~fvar:(fun v -> Term.repr v)
     ~fval:(fun x -> Term.repr x)
+

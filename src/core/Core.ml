@@ -513,56 +513,43 @@ let trace2 msg var1 var2 func1 func2 st =
   RStream.single st
 
 
-type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
-
-let rec wrap (x : Obj.t) =
-  Obj.(
-    let is_valid_tag =
-      List.fold_left
-      (fun f t tag -> tag <> t && f tag)
-      (fun _ -> true)
-      [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
-       forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-       final_tag  ; unaligned_tag; out_of_heap_tag
-      ]
-    in
-    let is_unboxed obj =
-      is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
-    in
-    if is_unboxed x
-    then Unboxed x
-    else
-      let t = tag x in
-      if is_valid_tag t
-      then
-	let f = if t = double_array_tag then !!! double_field else field in
-	Boxed (t, size x, f x)
-      else Invalid t
-    )
-
-let generic_show x =
-  let x = Obj.repr x in
-  let b = Buffer.create 1024 in
-  let rec inner o =
-    match wrap o with
-    | Invalid n             -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
-    | Unboxed n when !!!n=0 -> Buffer.add_string b "[]"
-    | Unboxed n             -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
-    | Boxed (t,l,f) when t=0 && l=1 && (match wrap (f 0) with Unboxed i when !!!i >=10 -> true | _ -> false) ->
-       Printf.bprintf b "var%d" (match wrap (f 0) with Unboxed i -> !!!i | _ -> failwith "shit")
-
-    | Boxed   (t, l, f) ->
-        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-        for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
-        Buffer.add_string b ">"
-  in
-  inner x;
-  Buffer.contents b
 
 exception Terminate of Obj.t
 
-let term_check pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
+let term_check1 pp rel_name arg1 ({State.scope = scope; env; subst} as st) =
+  let pp : Format.formatter -> 'r -> unit = !!!pp in
+  let args = arg1 in
+  (*let pp_pair fmt p = match Obj.magic p with
+  | (a,b) -> Format.fprintf fmt "(%a %a)" (pp_reified st pp) a (pp_reified st pp) b
+  in*)
+  let ret_updated new_list =
+    (* Format.printf "\tnew_list length = %d\n%!" (List.length new_list);
+    Format.fprintf Format.std_formatter "\tnew list:%! %a\n%!"
+      (Format.pp_print_list pp_pair)
+      new_list; *)
+    RStream.single { st with State.last_args = StringMap.add rel_name new_list st.State.last_args }
+  in
+  try let prevs = StringMap.find rel_name st.State.last_args in
+      prevs |> List.iter (fun prev ->
+        Format.fprintf Format.std_formatter "\ttesting unification: with\n%!";
+        Format.fprintf Format.std_formatter "\t  prev: %! %a\n%!" (pp_reified st pp) prev;
+        Format.fprintf Format.std_formatter "\t   new: %! %a\n%!" (pp_reified st pp) args;
+        match VarSubst.unify ~occurs:false ~subsume:true ~scope:(State.scope st) (State.env st) (State.subst st) prev args with
+        | None -> Format.fprintf Format.std_formatter "\tnot unifiable\n%!"
+        | Some _ -> raise (Terminate (VarSubst.reify env subst prev))
+      );
+      (* Format.printf "\tadding new (%dth) arg to history\n%!" (List.length prevs); *)
+      (* Format.printf "test: %s\n%!" (generic_show args); *)
+      (* Format.printf "\ttest: %a %a\n%!" (pp_reified st pp) arg1 (pp_reified st pp) arg2; *)
+      ret_updated (args::prevs)
+  with  Not_found -> ret_updated [args]
+      | Terminate prev ->
+        Format.printf "Branch terminated: `%a` is more general then `%a`\n%!"
+          (pp_reified st pp) prev
+          (pp_reified st pp) args; 
+        RStream.nil
+
+let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
   let pp : Format.formatter -> 'r -> unit = !!!pp in
   let args = !!!(arg1,arg2) in
   (* Format.printf "new_arg: %s\n%!" (generic_show args); *)
@@ -579,7 +566,9 @@ let term_check pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
   in
   try let prevs = StringMap.find rel_name st.State.last_args in
       prevs |> List.iter (fun prev ->
-        Format.fprintf Format.std_formatter "\ttesting unification with%! %a\n%!" pp_pair prev;
+        Format.fprintf Format.std_formatter "\ttesting unification: with%! %a\n%!" pp_pair prev;
+        Format.fprintf Format.std_formatter "\t  prev: %! %a\n%!" pp_pair prev;
+        Format.fprintf Format.std_formatter "\t   new: %! %a\n%!" pp_pair args;
         match VarSubst.unify ~occurs:false ~subsume:true ~scope:(State.scope st) (State.env st) (State.subst st) prev args with
         | None -> Format.fprintf Format.std_formatter "\tnot unifiable\n%!"
         | Some _ -> raise (Terminate (VarSubst.reify env subst prev))
@@ -590,7 +579,7 @@ let term_check pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
       ret_updated (args::prevs)
   with  Not_found -> ret_updated [args]
       | Terminate prev ->
-        (* Format.printf "Branch terminated: `%a` is more general then `%a`\n%!"
+        Format.printf "Branch terminated: `%a` is more general then `%a`\n%!"
           (pp_reified st pp) prev
-          (pp_reified st pp) args; *)
+          (pp_reified st pp) args; 
         RStream.nil

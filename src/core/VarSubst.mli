@@ -82,3 +82,5 @@ module Answer :
   end
 
 val reify : VarEnv.t -> t -> 'a -> Answer.t
+
+val generic_show: 'a -> string

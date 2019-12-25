@@ -64,5 +64,6 @@ module Std =
     let trace1 = Core.trace1
     let trace2 = Core.trace2
 
-    let term_check = Core.term_check
+    let term_check1 = Core.term_check1
+    let term_check2 = Core.term_check2
   end

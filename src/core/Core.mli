@@ -357,4 +357,5 @@ val trace2 : string -> ('a,'b) injected -> ('c,'d) injected ->
   (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
   goal
 
-val term_check: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> Obj.t -> goal
+val term_check1: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> goal
+val term_check2: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> Obj.t -> goal
