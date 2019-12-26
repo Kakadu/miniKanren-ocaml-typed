@@ -289,7 +289,7 @@ let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_t
          else None) 
     else None 
   in
-  let rec equal : 'a logic -> 'a logic -> bool = fun x y ->
+(*  let rec equal : 'a logic -> 'a logic -> bool = fun x y ->
     let tx, ty = Obj.tag x, Obj.tag y in
     match get_var_index x, get_var_index y with
     | Some i, Some j -> i = j
@@ -311,13 +311,15 @@ let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_t
           else false
         | _              , _                  -> false
       ) 
-  in
-  let rec find_subst : Obj.t IntMap.t option -> 'a logic -> 'a logic -> Obj.t IntMap.t option = fun subst_opt term res_term ->
+  in*)
+  let equal = (=) in
+  let (!!!) = Obj.magic in
+  let rec find_subst : Obj.t IntMap.t option -> Obj.t -> Obj.t -> Obj.t IntMap.t option = fun subst_opt term res_term ->
     match subst_opt with
     | None -> None
     | Some subst ->
       (
-        match Env.var env term with
+        match get_var_index term with
         | Some i ->
           (
             let v_opt = try Some (IntMap.find i subst) with Not_found -> None in
@@ -327,24 +329,29 @@ let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_t
           )
         | None   ->
           (
-            match Env.var env res_term with
-            | Some _ -> None
-            | None   ->
-              (
-                match wrap (Obj.repr term), wrap (Obj.repr res_term) with
-                | Unboxed _      , Unboxed _          -> if term = res_term then subst_opt else None
-                | Boxed (t, s, f), Boxed (rt, rs, rf) ->
-                  if t = rt && s = rs
-                  then
-                    let rec drag_subst i subs =
-                      if i < s
-                      then drag_subst (i + 1) (find_subst subs (!!!(f i)) (!!!(rf i)))
-                      else subs
-                    in
-                    drag_subst 0 subst_opt
-                  else None
-                | _              , _                  ->  None
-              )
+            match get_var_index res_term with
+            | Some _ -> None (* can't unify variables on the right *)
+            | None   -> begin
+              (* we don't have two variables here *)
+              let x = term in
+              let y = res_term in
+              let tx, ty = Obj.tag x, Obj.tag y in
+              match is_box tx, is_box ty with
+              | (false,false) -> if x=y then  subst_opt else None
+              | (false,true)
+              | (true,false) -> None
+              | (true,true) ->
+                let sx, sy = Obj.size x, Obj.size y in
+                if (tx = ty) && (sx = sy) then
+                  let fx, fy = Obj.field x, Obj.field y in
+                  let rec inner i acc =
+                    if i < sx
+                    then inner (i+1) @@ find_subst acc (!!!(fx i)) (!!!(fy i))
+                    else acc
+                  in
+                  inner 0 subst_opt
+                else None
+              end
           )
       )
   in
