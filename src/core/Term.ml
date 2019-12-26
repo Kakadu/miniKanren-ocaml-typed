@@ -276,3 +276,78 @@ let rec compare x y =
 let rec hash x = fold x ~init:1
   ~fvar:(fun acc v -> Hashtbl.hash (Var.hash v, List.fold_left (fun acc x -> Hashtbl.hash (acc, hash x)) acc v.Var.constraints))
   ~fval:(fun acc x -> Hashtbl.hash (acc, Hashtbl.hash x))
+  
+module IntMap = Map.Make (struct type t = int let compare = Pervasives.compare end)
+
+
+let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_terms terms ->
+  let get_var_index x = 
+    let tx = Obj.tag x in 
+    if is_box tx 
+    then (if is_var tx (Obj.size x) x 
+         then Some (Obj.magic x : Var.t).Var.index 
+         else None) 
+    else None 
+  in
+  let rec equal : 'a logic -> 'a logic -> bool = fun x y ->
+    let tx, ty = Obj.tag x, Obj.tag y in
+    match get_var_index x, get_var_index y with
+    | Some i, Some j -> i = j
+    | None  , Some _ -> false
+    | Some _, None   -> false
+    | None  , None   ->
+      ( let sx, sy = Obj.size x, Obj.size y in
+        match wrap (Obj.repr t1), wrap (Obj.repr t2) with
+        | Unboxed _      , Unboxed _          -> t1 = t2
+        | Boxed (t, s, f), Boxed (t1, s1, f1) ->
+          if t = t1 && s = s1
+          then
+            let rec inner i = 
+              if i < s
+              then equal (!!!(f i)) (!!!(f1 i)) && inner (i + 1)
+              else true
+            in
+            inner 0
+          else false
+        | _              , _                  -> false
+      ) 
+  in
+  let rec find_subst : Obj.t IntMap.t option -> 'a logic -> 'a logic -> Obj.t IntMap.t option = fun subst_opt term res_term ->
+    match subst_opt with
+    | None -> None
+    | Some subst ->
+      (
+        match Env.var env term with
+        | Some i ->
+          (
+            let v_opt = try Some (IntMap.find i subst) with Not_found -> None in
+            match v_opt with
+            | Some v -> if equal (!!! v) (!!! res_term) then subst_opt else None
+            | None   -> Some (IntMap.add i (!!! res_term) subst)
+          )
+        | None   ->
+          (
+            match Env.var env res_term with
+            | Some _ -> None
+            | None   ->
+              (
+                match wrap (Obj.repr term), wrap (Obj.repr res_term) with
+                | Unboxed _      , Unboxed _          -> if term = res_term then subst_opt else None
+                | Boxed (t, s, f), Boxed (rt, rs, rf) ->
+                  if t = rt && s = rs
+                  then
+                    let rec drag_subst i subs =
+                      if i < s
+                      then drag_subst (i + 1) (find_subst subs (!!!(f i)) (!!!(rf i)))
+                      else subs
+                    in
+                    drag_subst 0 subst_opt
+                  else None
+                | _              , _                  ->  None
+              )
+          )
+      )
+  in
+  match find_subst (Some IntMap.empty) (!!! gen_terms) (!!! terms) with
+  | Some _ -> true
+  | None   -> false

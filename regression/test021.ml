@@ -140,12 +140,13 @@ and subtype a b =
 let rec simple_test a  =
   (hack "\nsimple_test a" a) &&&
   (my_term_check1 "check: simple_test {a}" a) &&&
-  conde
+  (my_term_check1 "check: simple_test {a}" (ia33554436 a))
+  (*conde
     [ fresh (c d)
        (c === ia33554436 a)       
        (simple_test c)
     ]
-    
+  *)  
 let rec simple_test2 a b =
   (hackboth "\nsimple_test2 a b" a b) &&&
   (my_term_check2 "check: simple_test2 {a;b}" a b) &&&

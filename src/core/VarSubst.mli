@@ -30,6 +30,7 @@ module Binding :
     val hash : t -> int
   end
 
+(** A substitution *)
 type t
 
 val empty : t
