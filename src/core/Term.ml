@@ -280,7 +280,7 @@ let rec hash x = fold x ~init:1
 module IntMap = Map.Make (struct type t = int let compare = Pervasives.compare end)
 
 
-let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_terms terms ->
+let rec more_general : Obj.t -> Obj.t -> bool = fun gen_terms terms ->
   let get_var_index x = 
     let tx = Obj.tag x in 
     if is_box tx 
@@ -315,6 +315,8 @@ let rec more_general : Env.t -> Obj.t list -> Obj.t list -> bool = fun env gen_t
   let equal = (=) in
   let (!!!) = Obj.magic in
   let rec find_subst : Obj.t IntMap.t option -> Obj.t -> Obj.t -> Obj.t IntMap.t option = fun subst_opt term res_term ->
+(*    Format.printf "\tfind_subst: %s\n%!" (show term);
+    Format.printf "\tand       : %s\n%!" (show res_term);*)
     match subst_opt with
     | None -> None
     | Some subst ->

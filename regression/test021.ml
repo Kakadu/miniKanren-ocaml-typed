@@ -33,10 +33,12 @@ include struct
 
 end
 
+let (!!!) = Obj.repr
+
 let () =
   Format.pp_set_margin Format.std_formatter 140;
   Format.pp_set_max_indent Format.std_formatter 2000
-
+(*
 let pp_reify_term fmt rr = Format.fprintf fmt "%a" pp_term_logic (rr#reify term_reify)
 
 let hack msg var =
@@ -64,22 +66,23 @@ let my_term_check1 msg a =
     Format.fprintf fmt "%a" pp_reify_term x
   in
   term_check1 pp msg (Obj.repr a) 
-
+*)
 (* ****** Relational stuff ******************** *)
 let (!!) x = OCanren.(inj @@ lift x)
 
 include struct
   open OCanren
   open OCanren.Std
+
 let ia33554436 a = w !!"ia33554436" (Std.List.list[a])
 let valuetype33554777 = w !!"valuetype33554777" (Std.List.list[])
 let object33554493 = w !!"object33554493" (Std.List.list[])
-let rec contravariant_subtype a b =
+let rec contravariant_subtype a b = relation "contravariant_subtype" [!!! a; !!! b] @@
   conde
     [ (b === a) &&& (is_valuetype b)
     ; (is_reference b) &&& (subtype b a)
     ]
-and covariant_subtype a b =
+and covariant_subtype a b = relation "covariant_subtype" [!!! a; !!! b] @@
   conde
     [ (a === b) &&& (is_valuetype a)
     ; (is_reference a) &&& (subtype a b)
@@ -94,17 +97,17 @@ and is_reference a =
     ]
 and is_unmanaged a = failure
 and is_valuetype a = failure
-and not_contravariant_subtype a b =
+and not_contravariant_subtype a b = relation "not_contravariant_subtype" [!!! a; !!! b] @@
   conde
     [ (b =/= a) &&& (is_valuetype b)
     ; (is_reference b) &&& (not_subtype b a)
     ]
-and not_covariant_subtype a b =
+and not_covariant_subtype a b = relation "not_covariant_subtype" [!!! a; !!! b] @@
   conde
     [ (a =/= b) &&& (is_valuetype a)
     ; (is_reference a) &&& (not_subtype a b)
     ]
-and not_subtype a b =
+and not_subtype a b = relation "not_subtype" [!!! a; !!! b] @@
   conde
     [ fresh (c d)
        (a === ia33554436 c)
@@ -121,7 +124,7 @@ and not_subtype a b =
        (b === ia33554436 c)
     ; (a === object33554493) &&& (b === valuetype33554777)
     ]
-and subtype a b =
+and subtype a b = relation "subtype" [!!! a; !!! b] @@
 (*  (hackboth "\nsubtype a b" a b) &&&
   (term_check2 "check: subtype {a,b}" a b) &&&*)
   conde
@@ -137,19 +140,19 @@ and subtype a b =
     ; (a === object33554493) &&& (b === object33554493)
     ]
 
-let rec simple_test a  =
-  (hack "\nsimple_test a" a) &&&
+let rec simple_test a = relation "simple_test" [!!! a] @@
+  (*(hack "\nsimple_test a" a) &&&
   (my_term_check1 "check: simple_test {a}" a) &&&
-  (my_term_check1 "check: simple_test {a}" (ia33554436 a))
-  (*conde
+  (my_term_check1 "check: simple_test {a}" (ia33554436 a))*)
+  conde
     [ fresh (c d)
        (c === ia33554436 a)       
        (simple_test c)
     ]
-  *)  
-let rec simple_test2 a b =
-  (hackboth "\nsimple_test2 a b" a b) &&&
-  (my_term_check2 "check: simple_test2 {a;b}" a b) &&&
+
+let rec simple_test2 a b = relation "simple_test2" [!!! a; !!! b] @@
+  (*(hackboth "\nsimple_test2 a b" a b) &&&
+  (my_term_check2 "check: simple_test2 {a;b}" a b) &&&*)
   conde
     [ fresh (c d)
        (c === ia33554436 a)       
@@ -158,29 +161,60 @@ let rec simple_test2 a b =
     ]
 end
 
-
+let my_reify r = r#reify term_reify
 
 let () =
-   let my_reify r = r#reify term_reify in
-   let stream =
-      let open OCanren  in
-      let open OCanren.Std in
-      run (succ (succ (succ (succ (succ (succ (succ (succ (succ (succ one))))))))))
-      (fun a b c d e f g h i j k ->
-(*        (simple_test2 a (ia33554436 a))*)
-(*        (simple_test a)*)
-        (simple_test (ia33554436 a))
-        (* (subtype a (ia33554436 a)) *)
-        (* &&& (subtype b (ia33554436 a)) &&& (subtype valuetype33554777 c) &&& (subtype d (ia33554436 d)) &&& (subtype e (ia33554436 d)) &&& (subtype f a) &&& (subtype g a) &&& (subtype f h) &&& (subtype g h) &&& (subtype c h) &&& (subtype i h) &&& (subtype j h) &&& (subtype k h) &&& (subtype a (ia33554436 d)) &&& (subtype d (ia33554436 a)) &&& (subtype a (ia33554436 d)) &&& (subtype d (ia33554436 a)) &&& (default_constructor c) &&& (is_reference j) *)
-      )
-      (fun a b c d e f g h i j k -> (my_reify a,my_reify b,my_reify c,my_reify d,my_reify e,my_reify f,my_reify g,my_reify h,my_reify i,my_reify j,my_reify k))
-   in
- 
-    let answers = OCanren.Stream.take ~n:1 stream in 
- 
-    match answers with
-    | [] -> print_endline "no answers"
-    | [((a,b,c,d,e,f,g,h,i,j,k))] ->
-       Format.printf "(%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a)\n%!" pp_term_logic a pp_term_logic b pp_term_logic c pp_term_logic d pp_term_logic e pp_term_logic f pp_term_logic g pp_term_logic h pp_term_logic i pp_term_logic j pp_term_logic k
-    | _ -> failwith "should not happen"
-   
+  let stream =
+    let open OCanren  in
+    let open OCanren.Std in
+    run one
+      simple_test
+      my_reify
+  in
+  let answers = OCanren.Stream.take ~n:1 stream in
+
+  match answers with
+  | [] -> print_endline "no answers"
+  | [a] -> Format.printf "(%a)\n%!" pp_term_logic a
+  | _ -> failwith "should not happen"
+
+let () =
+  let stream =
+    let open OCanren  in
+    let open OCanren.Std in
+    run one
+      (fun a -> (simple_test2 a (ia33554436 a)))
+      my_reify
+  in
+
+  let answers = OCanren.Stream.take ~n:1 stream in
+  match answers with
+  | [] -> print_endline "no answers"
+  | [a] -> Format.printf "(%a)\n%!" pp_term_logic a
+  | _ -> failwith "should not happen"
+
+let () =
+  (* test 101 *)
+  let stream =
+    let open OCanren  in
+    let open OCanren.Std in
+    run (succ (succ (succ (succ (succ (succ (succ (succ (succ (succ one))))))))))
+    (fun a b c d e f g h i j k ->
+       (subtype a (ia33554436 a)) &&& (subtype b (ia33554436 a)) &&& (subtype valuetype33554777 c) &&&
+       (subtype d (ia33554436 d)) &&& (subtype e (ia33554436 d)) &&& (subtype f a) &&& (subtype g a) &&&
+       (subtype f h) &&& (subtype g h) &&& (subtype c h) &&& (subtype i h) &&& (subtype j h) &&& (subtype k h) &&&
+       (* no answers because next two conjuncts *)
+       (subtype a (ia33554436 d)) &&& (subtype d (ia33554436 a)) &&&
+       (subtype a (ia33554436 d)) &&& (subtype d (ia33554436 a)) &&& (default_constructor c) &&& (is_reference j)
+    )
+    (fun a b c d e f g h i j k -> (my_reify a,my_reify b,my_reify c,my_reify d,my_reify e,my_reify f,my_reify g,my_reify h,my_reify i,my_reify j,my_reify k))
+  in
+
+  let answers = OCanren.Stream.take ~n:1 stream in
+
+  match answers with
+  | [] -> print_endline "no answers"
+  | [((a,b,c,d,e,f,g,h,i,j,k))] ->
+     Format.printf "(%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a)\n%!" pp_term_logic a pp_term_logic b pp_term_logic c pp_term_logic d pp_term_logic e pp_term_logic f pp_term_logic g pp_term_logic h pp_term_logic i pp_term_logic j pp_term_logic k
+  | _ -> failwith "should not happen"
+

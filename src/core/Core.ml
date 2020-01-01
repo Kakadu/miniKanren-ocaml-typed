@@ -181,6 +181,18 @@ module State =
           in
           Answer.make env (helper [] answ)
       )
+
+    let history_exn st relname = StringMap.find relname st.last_args
+    let history     st relname =
+      try Some(history_exn st relname)
+      with Not_found -> None
+
+    let update_history st relname new_arg =
+      let newh =
+        try history_exn st relname
+        with Not_found -> [ new_arg ]
+      in
+      { st with last_args = StringMap.add relname newh st.last_args }
   end
 
 let (!!!) = Obj.magic
@@ -534,9 +546,12 @@ let term_check1 pp rel_name arg1 ({State.scope = scope; env; subst} as st) =
         Format.fprintf Format.std_formatter "\ttesting unification: with\n%!";
         Format.fprintf Format.std_formatter "\t  prev: %! %a\n%!" (pp_reified st pp) prev;
         Format.fprintf Format.std_formatter "\t   new: %! %a\n%!" (pp_reified st pp) args;
-        match VarSubst.unify ~occurs:false ~subsume:true ~scope:(State.scope st) (State.env st) (State.subst st) prev args with
+        if Term.more_general (Obj.repr prev) (Obj.repr args)
+        then raise (Terminate (VarSubst.reify env subst prev))
+        else Format.fprintf Format.std_formatter "\tnot unifiable\n%!"
+        (*match VarSubst.unify ~occurs:false ~subsume:true ~scope:(State.scope st) (State.env st) (State.subst st) prev args with
         | None -> Format.fprintf Format.std_formatter "\tnot unifiable\n%!"
-        | Some _ -> raise (Terminate (VarSubst.reify env subst prev))
+        | Some _ -> raise (Terminate (VarSubst.reify env subst prev))*)
       );
       (* Format.printf "\tadding new (%dth) arg to history\n%!" (List.length prevs); *)
       (* Format.printf "test: %s\n%!" (generic_show args); *)
@@ -552,10 +567,8 @@ let term_check1 pp rel_name arg1 ({State.scope = scope; env; subst} as st) =
 let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
   let pp : Format.formatter -> 'r -> unit = !!!pp in
   let args = !!!(arg1,arg2) in
-  (* Format.printf "new_arg: %s\n%!" (generic_show args); *)
-  (* pp_reified st pp Format.std_formatter args; *)
-  let pp_pair fmt p = match Obj.magic p with
-  | (a,b) -> Format.fprintf fmt "(%a %a)" (pp_reified st pp) a (pp_reified st pp) b
+  let pp_pair fmt (a,b) =
+    Format.fprintf fmt "(%a %a)" (pp_reified st pp) a (pp_reified st pp) b
   in
   let ret_updated new_list =
     (* Format.printf "\tnew_list length = %d\n%!" (List.length new_list);
@@ -566,12 +579,19 @@ let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) 
   in
   try let prevs = StringMap.find rel_name st.State.last_args in
       prevs |> List.iter (fun prev ->
-        Format.fprintf Format.std_formatter "\ttesting unification: with%! %a\n%!" pp_pair prev;
-        Format.fprintf Format.std_formatter "\t  prev: %! %a\n%!" pp_pair prev;
-        Format.fprintf Format.std_formatter "\t   new: %! %a\n%!" pp_pair args;
-        match VarSubst.unify ~occurs:false ~subsume:true ~scope:(State.scope st) (State.env st) (State.subst st) prev args with
-        | None -> Format.fprintf Format.std_formatter "\tnot unifiable\n%!"
-        | Some _ -> raise (Terminate (VarSubst.reify env subst prev))
+        Format.fprintf Format.std_formatter "\ttesting subsumption:\n%!";
+        Format.fprintf Format.std_formatter "\t  prev: %! %a\n%!" pp_pair !!!prev;
+        let args = VarSubst.reify (State.env st) (State.subst st) args in
+        Format.fprintf Format.std_formatter "\t   new: %! %a\n%!" pp_pair !!!(args);
+        if Term.more_general prev args
+        then
+          match State.reify arg2 st  with
+          | [] -> assert false
+          | [ ans1 ] when Answer.disequality ans1 = [] -> raise (Terminate (VarSubst.reify env subst prev))
+          | _::_::_ -> failwith "more then 1 answer"
+          | [ ans1 ] ->
+              let () = Printf.printf "subsumption in present of consraints is not a subsumption\n%!" in
+              Format.fprintf Format.std_formatter "\tnot subsumable\n%!"
       );
       (* Format.printf "\tadding new (%dth) arg to history\n%!" (List.length prevs); *)
       (* Format.printf "test: %s\n%!" (generic_show args); *)
@@ -579,7 +599,36 @@ let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) 
       ret_updated (args::prevs)
   with  Not_found -> ret_updated [args]
       | Terminate prev ->
+        Format.printf "Branch terminated: \n%!";
         Format.printf "Branch terminated: `%a` is more general then `%a`\n%!"
-          (pp_reified st pp) prev
-          (pp_reified st pp) args; 
+          pp_pair !!!prev
+          pp_pair !!!args;
         RStream.nil
+
+let relation name args g st =
+  RStream.from_fun (fun () ->
+    let refined_args = VarSubst.reify (State.env st) (State.subst st) args in
+    if
+      try
+        let prevs = State.history_exn st name in
+        prevs |> List.iter (fun prev ->
+          if Term.more_general prev refined_args
+          then
+            match State.reify args st with
+            | [] -> assert false
+            | [ ans1 ] when Answer.disequality ans1 = [] ->
+              raise (Terminate (VarSubst.reify (State.env st) (State.subst st) prev))
+            | _::_::_ -> failwith "more then 1 answer"
+            | [ ans1 ] ->
+                let () = Printf.printf "subsumption in present of consraints is not a subsumption\n%!" in
+                Format.fprintf Format.std_formatter "\tnot subsumable\n%!"
+        );
+        false
+      with Not_found -> false
+         | Terminate _ -> true
+    then (* Printf.printf "Divergence in %s\n%!" name; *)
+(*      let _ = raise Divergence in *)
+      RStream.nil
+    else
+      g (State.update_history st name refined_args)
+  )

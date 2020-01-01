@@ -207,9 +207,6 @@ let unify ?(occurs=true) ?(subsume=false) ?(scope=Term.Var.non_local_scope) env 
       ~fk:(fun ((_, subst) as acc) l v y ->
           if subsume && (l = Term.R)
           then 
-            let () = Format.printf "\tFail in subsumption check\n%!" in 
-            let () = Format.printf "\tvar  = %s\n%!" (generic_show v) in 
-            let () = Format.printf "\tterm = %s\n%!" (generic_show y) in             
             raise Unification_failed
           else match walk env subst v with
           | Var v    -> extend v y acc
@@ -218,18 +215,18 @@ let unify ?(occurs=true) ?(subsume=false) ?(scope=Term.Var.non_local_scope) env 
   in
   try
     let x, y = Term.(repr x, repr y) in
-    let () = Format.printf "\tGoing to unify:\n%!" in 
+    (*let () = Format.printf "\tGoing to unify:\n%!" in
     let () = Format.printf "\tx   = %s\n%!" (generic_show x) in 
-    let () = Format.printf "\ty   = %s\n%!" (generic_show y) in 
+    let () = Format.printf "\ty   = %s\n%!" (generic_show y) in *)
     Some (helper x y ([], subst))
   with Term.Different_shape _ ->
-       Format.printf "\tunification failed: Different_shape\n%!"; 
+(*       Format.printf "\tunification failed: Different_shape\n%!"; *)
        None
      | Unification_failed ->  
-       Format.printf "\tunification failed: Unification_failed\n%!"; 
+(*       Format.printf "\tunification failed: Unification_failed\n%!"; *)
        None
      | Occurs_check -> 
-       Format.printf "\tunification failed: Occurs_check\n%!"; 
+(*       Format.printf "\tunification failed: Occurs_check\n%!"; *)
        None
 
 let apply env subst x = Obj.magic @@

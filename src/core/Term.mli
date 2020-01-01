@@ -114,3 +114,5 @@ val show : t -> string
 val equal   : t -> t -> bool
 val compare : t -> t -> int
 val hash    : t -> int
+
+val more_general : Obj.t -> Obj.t -> bool

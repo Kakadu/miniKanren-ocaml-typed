@@ -113,7 +113,7 @@ let _ =
 
      The following (somewhat shameful) implementation, however, works for both cases:
      let rec sorto x y = conde [
-       (x === !!Nil) &&& (y === !!Nil);
+       (x === !Std.List.nil ()) &&& (y === !Std.List.nil ());
        fresh (s xs xs')
          (y === s % xs')
          (smallesto x s xs)
