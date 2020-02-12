@@ -357,7 +357,11 @@ val trace2 : string -> ('a,'b) injected -> ('c,'d) injected ->
   (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
   goal
 
-val term_check1: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> goal
-val term_check2: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> Obj.t -> goal
+(* val term_check1: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> goal
+val term_check2: (Format.formatter -> 'r -> unit) -> string -> Obj.t -> Obj.t -> goal *)
 
 val relation : string -> Obj.t list -> goal -> goal
+
+val (===?):
+  (Format.formatter -> ('a, 'b logic) Logic.reified -> unit) ->
+  ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal

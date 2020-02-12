@@ -110,9 +110,11 @@ val fold2 :
   init:'a -> t -> t -> 'a
 
 val show : t -> string
+val has_cycles: 'a  -> bool
 
 val equal   : t -> t -> bool
 val compare : t -> t -> int
 val hash    : t -> int
 
-val more_general : Obj.t -> Obj.t -> bool
+module IntMap : Map.S with type key = int
+val more_general : Obj.t -> Obj.t -> Obj.t IntMap.t option 

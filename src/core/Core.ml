@@ -527,7 +527,7 @@ let trace2 msg var1 var2 func1 func2 st =
 
 
 exception Terminate of Obj.t
-
+(*
 let term_check1 pp rel_name arg1 ({State.scope = scope; env; subst} as st) =
   let pp : Format.formatter -> 'r -> unit = !!!pp in
   let args = arg1 in
@@ -561,7 +561,7 @@ let term_check1 pp rel_name arg1 ({State.scope = scope; env; subst} as st) =
       | Terminate prev ->
         Format.printf "Branch terminated: `%a` is more general then `%a`\n%!"
           (pp_reified st pp) prev
-          (pp_reified st pp) args; 
+          (pp_reified st pp) args;
         RStream.nil
 
 let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) =
@@ -604,7 +604,7 @@ let term_check2 pp rel_name arg1 arg2 ({State.scope = scope; env; subst} as st) 
           pp_pair !!!prev
           pp_pair !!!args;
         RStream.nil
-
+*)
 let relation name args g st =
   RStream.from_fun (fun () ->
     let refined_args = VarSubst.reify (State.env st) (State.subst st) args in
@@ -612,12 +612,23 @@ let relation name args g st =
       try
         let prevs = State.history_exn st name in
         prevs |> List.iter (fun prev ->
-          if Term.more_general prev refined_args
-          then
+          match Term.more_general prev refined_args with
+          | None -> ()
+          | Some s ->
+            (* let () = Format.printf "arg:         %s\n%!" (Term.show !!!args) in *)
+            assert (not (Term.has_cycles refined_args));
+            assert (not (Term.has_cycles prev));
+            let () = Format.printf "       args: %s\n%!" (Term.show !!!args) in
+            let () = Format.printf "refined arg: %s\n%!" (Term.show !!!refined_args) in
+            let () = Format.printf "prev:        %s\n%!" (Term.show !!!prev) in
+            let () =
+              Term.IntMap.iter (fun k v -> Format.printf "\t\t%d => %s\n%!" k (Term.show !!!v)) s
+            in
             match State.reify args st with
             | [] -> assert false
             | [ ans1 ] when Answer.disequality ans1 = [] ->
-              raise (Terminate (VarSubst.reify (State.env st) (State.subst st) prev))
+              (* raise (Terminate (VarSubst.reify (State.env st) (State.subst st) prev)) *)
+              raise (Terminate prev)
             | _::_::_ -> failwith "more then 1 answer"
             | [ ans1 ] ->
                 let () = Printf.printf "subsumption in present of consraints is not a subsumption\n%!" in
@@ -632,3 +643,18 @@ let relation name args g st =
     else
       g (State.update_history st name refined_args)
   )
+
+let (===?) pp x y st =
+  let xr = VarSubst.reify (State.env st) (State.subst st) !!!x in
+  let yr = VarSubst.reify (State.env st) (State.subst st) !!!y in
+  let pp fmt x = pp fmt (Logic.make_rr (State.env st) !!!x) in
+  
+  match State.unify x y st with
+  | Some st ->
+      Format.printf " OK: %a === %a\n%!"
+        pp !!!xr
+        pp !!!yr;
+      success st
+  | None    ->
+      Format.printf "_|_: %a === %a\n%!" pp !!!xr pp !!!yr;
+      failure st
