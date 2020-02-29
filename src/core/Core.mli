@@ -346,3 +346,10 @@ module Tabling :
        ('d -> 'a -> State.t Stream.t goal')) ->
       (('b -> 'c) -> 'd) -> 'b -> 'c
   end
+
+
+val structural :
+  ('a,'b) injected ->
+  (Env.t -> ('a,'b) injected -> 'b) ->
+  ('b -> bool) ->
+  goal

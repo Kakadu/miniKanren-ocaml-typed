@@ -62,4 +62,8 @@ module Std =
     let some = Option.some
     let none = Option.none
     let pair = Pair.pair
+
+
+    let fortytwo = Core.structural
+
   end

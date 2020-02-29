@@ -110,12 +110,28 @@ module Answer :
     let hash (env, t) = Term.hash t
   end
 
+module Prunes = struct
+  type t = ((Env.t -> Obj.t -> Obj.t) * (Obj.t -> bool)) Term.VarMap.t
+
+  (* Returns true when constraints are violated *)
+  let recheck : Env.t -> Subst.t -> t -> bool = fun env s ps ->
+    Term.VarMap.fold (fun k v acc ->
+        acc ||
+        (try let (reifier, checker) = v in
+            let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
+            checker reified
+        with Not_found -> false)
+     ) ps false
+
+end
+
 module State =
   struct
     type t =
       { env   : Env.t
       ; subst : Subst.t
       ; ctrs  : Disequality.t
+      ; prunes: Prunes.t
       ; scope : Term.Var.scope
       }
 
@@ -125,6 +141,7 @@ module State =
       { env   = Env.empty ()
       ; subst = Subst.empty
       ; ctrs  = Disequality.empty
+      ; prunes = Term.VarMap.empty
       ; scope = Term.Var.new_scope ()
       }
 
@@ -132,6 +149,7 @@ module State =
     let subst {subst} = subst
     let constraints {ctrs} = ctrs
     let scope {scope} = scope
+    let prunes {prunes} = prunes
 
     let fresh {env; scope} = Env.fresh ~scope env
 
@@ -143,7 +161,10 @@ module State =
         | Some (prefix, subst) ->
           match Disequality.recheck env subst ctrs prefix with
           | None      -> None
-          | Some ctrs -> Some {st with subst; ctrs}
+          | Some ctrs ->
+            match Prunes.recheck env subst (prunes st) with
+            | true  -> None
+            | false -> Some {st with subst; ctrs}
 
     let diseq x y ({env; subst; ctrs; scope} as st) =
       match Disequality.add env subst ctrs x y with
@@ -204,6 +225,11 @@ let (=/=) x y st =
   | None    -> failure st
 
 let diseq = (=/=)
+
+let structural var rr k st =
+  match Term.var var with
+  | None -> success st
+  | Some v -> success { st with State.prunes = Term.VarMap.add v (Obj.magic (rr,k)) (State.prunes st) }
 
 let delay g st = Stream.from_fun (fun () -> g () st)
 
@@ -477,3 +503,5 @@ module Tabling =
       g := currier g_tabled;
       !g
   end
+
+
