@@ -107,12 +107,28 @@ module Answer :
     let hash (env, t) = Term.hash t
   end
 
+module Prunes = struct
+  type t = ((VarEnv.t -> Obj.t -> Obj.t) * (Obj.t -> bool)) Term.VarMap.t
+
+  (* Returns true when constraints are violated *)
+  let recheck : VarEnv.t -> VarSubst.t -> t -> bool = fun env s ps ->
+    Term.VarMap.fold (fun k v acc ->
+        acc ||
+        (try let (reifier, checker) = v in
+            let reified = reifier env (Obj.magic @@ VarSubst.apply env s k) in
+            checker reified
+        with Not_found -> false)
+     ) ps false
+
+end
+
 module State =
   struct
     type t =
       { env   : VarEnv.t
       ; subst : VarSubst.t
       ; ctrs  : Disequality.t
+      ; prunes: Prunes.t
       ; scope : Term.Var.scope
       }
 
@@ -122,6 +138,7 @@ module State =
       { env   = VarEnv.empty ()
       ; subst = VarSubst.empty
       ; ctrs  = Disequality.empty
+      ; prunes = Term.VarMap.empty
       ; scope = Term.Var.new_scope ()
       }
 
@@ -129,6 +146,7 @@ module State =
     let subst {subst} = subst
     let constraints {ctrs} = ctrs
     let scope {scope} = scope
+    let prunes {prunes} = prunes
 
     let fresh {env; scope} = VarEnv.fresh ~scope env
 
@@ -140,7 +158,10 @@ module State =
         | Some (prefix, subst) ->
           match Disequality.recheck env subst ctrs prefix with
           | None      -> None
-          | Some ctrs -> Some {st with subst; ctrs}
+          | Some ctrs ->
+            match Prunes.recheck env subst (prunes st) with
+            | true  -> None
+            | false -> Some {st with subst; ctrs}
 
     let diseq x y ({env; subst; ctrs; scope} as st) =
       match Disequality.add env subst ctrs x y with
@@ -205,6 +226,12 @@ let diseq = (=/=)
 let delay g st = RStream.from_fun (fun () -> g () st)
 
 let conj f g st = RStream.bind (f st) g
+
+let structural var rr k st =
+  match Term.var var with
+  | None -> success st
+  | Some v -> success { st with State.prunes = Term.VarMap.add v (Obj.magic (rr,k)) (State.prunes st) }
+
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
 
@@ -472,3 +499,5 @@ module Tabling =
       g := currier g_tabled;
       !g
   end
+
+
