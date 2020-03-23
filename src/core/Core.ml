@@ -203,12 +203,12 @@ module State =
       | None      -> None
       | Some ctrs -> Some {st with ctrs}
 
+    (* returns always non-empty list *)
     let reify x {env; subst; ctrs} =
       let answ = Subst.reify env subst x in
-      let diseqs = Disequality.reify env subst ctrs x in
-      if List.length diseqs = 0 then
-        [Answer.make env answ]
-      else
+      match Disequality.reify env subst ctrs x with
+      | [] -> [Answer.make env answ]
+      | diseqs ->
         ListLabels.map diseqs ~f:(fun diseq ->
           let rec helper forbidden t =
             Term.map t
@@ -232,7 +232,7 @@ module State =
               )
           in
           Answer.make env (helper [] answ)
-      )
+        )
   end
 
 let (!!!) = Obj.magic
@@ -250,14 +250,14 @@ let (===) x y st =
   | None    -> failure st
 
 let unify = (===)
-          
+
 let (=/=) x y st =
   match State.diseq x y st with
   | Some st -> success st
   | None    -> failure st
 
 let diseq = (=/=)
-          
+
 let delay g st = Stream.from_fun (fun () -> g () st)
 
 let conj f g st = Stream.bind (f st) g
@@ -477,9 +477,11 @@ module Table :
     type t = Cache.t H.t
 
     let make_answ args st =
-      let env = Env.create ~anchor:Term.Var.tabling_env in
-      let [answ] = State.reify args st in
-      Answer.lift env answ
+      match State.reify args st with
+      | [answ] ->
+          let env = Env.create ~anchor:Term.Var.tabling_env in
+          Answer.lift env answ
+      | _      -> failwith "should not happen"
 
     let create () = H.create 1031
 
