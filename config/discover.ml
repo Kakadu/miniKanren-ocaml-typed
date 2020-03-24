@@ -53,19 +53,21 @@ let discover_camlp5_dir cfg =
 
 let discover_camlp5_flags cfg =
   let camlp5_dir = discover_camlp5_dir cfg in
-  let camlp5_archives =
+  let camlp5_archives ext =
     List.map
-      (fun arch -> String.concat Filename.dir_sep [camlp5_dir; arch])
-      ["pa_o.cmo"; "pa_op.cmo"; "pr_o.cmo"; "pr_dump.cmo" ]
+      (fun arch -> String.concat Filename.dir_sep [camlp5_dir; arch ^ ext])
+      ["pa_o."; "pa_op."; "pr_o."; "pr_dump." ]
   in
-  Cfg.Flags.write_lines "camlp5-flags.cfg" camlp5_archives
+  Cfg.Flags.write_lines "camlp5-flags.cfg" @@ camlp5_archives "cmo";
+  Cfg.Flags.write_lines "camlp5-flags-native.cfg" @@ camlp5_archives "cmx"
 
 let discover_gt_flags cfg =
-  let gt_archives =
+  let gt_archives mode =
     Cfg.Process.run_capture_exn cfg
-      "ocamlfind" ["query"; "-pp"; "camlp5"; "-a-format"; "-predicates"; "byte"; "GT,GT.syntax.all"]
+      "ocamlfind" ["query"; "-pp"; "camlp5"; "-a-format"; "-predicates"; mode; "GT,GT.syntax.all"]
   in
-  Cfg.Flags.write_lines "gt-flags.cfg" @@ extract_words gt_archives
+  Cfg.Flags.write_lines "gt-flags.cfg" @@ extract_words @@ gt_archives "byte";
+  Cfg.Flags.write_lines "gt-flags-native.cfg" @@ extract_words @@ gt_archives "native"
 
 let discover_logger_flags cfg =
   (* logger has two kinds of CMOs: two from camlp5 (pr_o and pr_dump) and one for logger.
@@ -92,14 +94,13 @@ let discover_logger_flags cfg =
   let pr_dump_cmo = "pr_dump.cmo" in
   let cmos =
     extract_words logger_archives |>
-    List.map (fun file ->
-      if Filename.basename file = pr_o_cmo then
-        Filename.concat camlp5_dir pr_o_cmo
-      else if Filename.basename file = pr_dump_cmo then
-        Filename.concat camlp5_dir pr_dump_cmo
-      else file
+    List.filter (fun file ->
+      (Filename.basename file <> pr_o_cmo) &&
+      (Filename.basename file <> pr_dump_cmo)
     )
   in
+  Cfg.Flags.write_lines "logger-flags-p5.cfg" @@
+    List.map (Filename.concat camlp5_dir) [pr_o_cmo; pr_dump_cmo];
   Cfg.Flags.write_lines "logger-flags.cfg" cmos
 
 (*** generating dune files ***)
