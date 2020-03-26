@@ -66,8 +66,14 @@ let discover_gt_flags cfg =
     Cfg.Process.run_capture_exn cfg
       "ocamlfind" ["query"; "-pp"; "camlp5"; "-a-format"; "-predicates"; mode; "GT,GT.syntax.all"]
   in
+  let gt_clibs =
+    Cfg.Process.run_capture_exn cfg
+      "ocamlfind" ["query"; "-pp"; "camlp5"; "-l-format"; "-predicates"; "native"; "GT,GT.syntax.all"]
+  in
+
   Cfg.Flags.write_lines "gt-flags.cfg" @@ extract_words @@ gt_archives "byte";
-  Cfg.Flags.write_lines "gt-flags-native.cfg" @@ extract_words @@ gt_archives "native"
+  Cfg.Flags.write_lines "gt-flags-native.cfg" @@
+    (extract_words gt_clibs @ (extract_words @@ gt_archives "native"))
 
 let discover_logger_flags cfg =
   (* logger has two kinds of CMOs: two from camlp5 (pr_o and pr_dump) and one for logger.
@@ -86,22 +92,28 @@ let discover_logger_flags cfg =
   *)
 
   let camlp5_dir = discover_camlp5_dir cfg in
-  let logger_archives =
+  let logger_archives mode =
     Cfg.Process.run_capture_exn cfg
-      "ocamlfind" ["query"; "-pp"; "camlp5"; "-a-format"; "-predicates"; "byte"; "logger,logger.syntax"]
+      "ocamlfind" ["query"; "-pp"; "camlp5"; "-a-format"; "-predicates"; mode; "logger,logger.syntax"]
   in
-  let pr_o_cmo = "pr_o.cmo" in
-  let pr_dump_cmo = "pr_dump.cmo" in
+  let pr_cmos = [ "pr_o.cmo"; "pr_dump.cmo" ] in
+  let pr_cmxs = [ "pr_o.cmo"; "pr_dump.cmo" ] in
+
   let cmos =
-    extract_words logger_archives |>
-    List.filter (fun file ->
-      (Filename.basename file <> pr_o_cmo) &&
-      (Filename.basename file <> pr_dump_cmo)
-    )
+    logger_archives "byte" |> extract_words  |>
+    List.filter (fun file -> not (List.mem (Filename.basename file) pr_cmos))
   in
+  let cmxs =
+    logger_archives "native" |> extract_words  |>
+    List.filter (fun file -> not (List.mem (Filename.basename file) pr_cmxs))
+  in
+
   Cfg.Flags.write_lines "logger-flags-p5.cfg" @@
-    List.map (Filename.concat camlp5_dir) [pr_o_cmo; pr_dump_cmo];
-  Cfg.Flags.write_lines "logger-flags.cfg" cmos
+    List.map (Filename.concat camlp5_dir) pr_cmos;
+  Cfg.Flags.write_lines "logger-flags-p5-native.cfg" @@
+    List.map (Filename.concat camlp5_dir) pr_cmxs;
+  Cfg.Flags.write_lines "logger-flags.cfg" cmos;
+  Cfg.Flags.write_lines "logger-flags-native.cfg" cmxs
 
 (*** generating dune files ***)
 

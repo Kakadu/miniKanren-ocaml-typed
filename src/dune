@@ -6,13 +6,12 @@
   (libraries GT)
   (preprocess
     (action
-      (run camlp5
-        %{read-lines:../config/camlp5-flags.cfg}
-        %{read-lines:../config/gt-flags.cfg}
-        %{input-file})
+      (run src/pp5.native %{input-file})
     )
   )
 )
+
+; custom preprocesses as single executables
 
 (rule
  (targets pp5.byte)
@@ -21,7 +20,45 @@
              %{read-lines:../config/camlp5-flags.cfg}
              %{read-lines:../config/gt-flags.cfg}
              %{read-lines:../config/logger-flags.cfg}
-             %{workspace_root}/camlp5/pa_ocanren.cma
+             ; We intentionally don't put 'pa_ocanren' here because
+             ; it will broke a little bit compilation in 'src/'
+             -o %{targets}
+             ))
+)
+
+(rule
+ (targets pp5.native)
+ (action  (run mkcamlp5.opt
+             %{read-lines:../config/camlp5-flags-native.cfg}
+             %{read-lines:../config/gt-flags-native.cfg}
+             %{read-lines:../config/logger-flags-native.cfg}
+             ; We intentionally don't put 'pa_ocanren' here because
+             ; it will broke a little bit compilation in 'src/'
+             -o %{targets}
+             ))
+)
+
+; custom preprocessor with ocanren extension enabled
+(rule
+ (targets pp5+ocanren.byte)
+ (deps    %{workspace_root}/camlp5/pa_ocanren.cma)
+ (action  (run mkcamlp5
+             %{read-lines:../config/camlp5-flags.cfg}
+             %{read-lines:../config/gt-flags.cfg}
+             %{read-lines:../config/logger-flags.cfg}
+             %{deps}
+             -o %{targets}
+             ))
+)
+
+(rule
+ (targets pp5+ocanren.native)
+ (deps    %{workspace_root}/camlp5/pa_ocanren.cmxa)
+ (action  (run mkcamlp5.opt
+             %{read-lines:../config/camlp5-flags-native.cfg}
+             %{read-lines:../config/gt-flags-native.cfg}
+             %{read-lines:../config/logger-flags-native.cfg}
+             %{deps}
              -o %{targets}
              ))
 )
