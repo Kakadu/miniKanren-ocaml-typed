@@ -65,5 +65,6 @@ module Std =
 
 
     let structural = Core.structural
+    let minimize  = Core.minimize
 
   end

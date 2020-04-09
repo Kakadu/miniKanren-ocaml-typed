@@ -1,0 +1,27 @@
+inject_paths example0, all answers {
+q=[];
+}
+inject_paths example1, all answers {
+q=[("start", "b"); ("b", "c"); ("c", "fin")];
+}
+wrap "start" "fin" example1, all answers {
+q=[("start", "b"); ("b", "c"); ("c", "fin")];
+}
+wrap "start" "fin" example2, all answers {
+q=[("start", "b1"); ("b1", "c1"); ("c1", "d1"); ("d1", "e1"); ("e1", "f1"); ("f1", "fin")];
+q=[("start", "fin")];
+q=[("start", "b2"); ("b2", "c2"); ("c2", "d2"); ("d2", "e2"); ("e2", "fin")];
+q=[("start", "b3"); ("b3", "c3"); ("c3", "d3"); ("d3", "fin")];
+q=[("start", "b4"); ("b4", "c4"); ("c4", "fin")];
+q=[("start", "b5"); ("b5", "fin")];
+}
+min "start" "fin" example2, 3 answers {
+setting intial cost CConcrete (6)
+q=[("start", "b1"); ("b1", "c1"); ("c1", "d1"); ("d1", "e1"); ("e1", "f1"); ("f1", "fin")];
+setting cost CConcrete (1)
+q=[("start", "fin")];
+skipping answer with cost 5 (which is > then 1)
+skipping answer with cost 4 (which is > then 1)
+skipping answer with cost 3 (which is > then 1)
+skipping answer with cost 2 (which is > then 1)
+}

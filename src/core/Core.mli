@@ -360,3 +360,10 @@ module Tabling :
       (('b -> 'c) -> 'd) -> 'b -> 'c
   end
 
+
+type cost = CConcrete of int | CInfinite
+
+val minimize : ('b -> cost) ->
+  (Env.t -> 'logicvar -> 'b) ->
+  (('a, 'b) injected as 'logicvar) ->
+  ('logicvar -> goal) -> goal
