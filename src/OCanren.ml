@@ -65,6 +65,7 @@ module Std =
 
 
     let structural = Core.structural
+    type cost = Core.cost = CFixed of GT.int | CAtLeast of GT.int
     let minimize  = Core.minimize
 
   end

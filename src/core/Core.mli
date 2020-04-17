@@ -361,7 +361,7 @@ module Tabling :
   end
 
 
-type cost = CConcrete of int | CInfinite
+type cost = CFixed of GT.int | CAtLeast of GT.int
 
 val minimize : ('b -> cost) ->
   (Env.t -> 'logicvar -> 'b) ->

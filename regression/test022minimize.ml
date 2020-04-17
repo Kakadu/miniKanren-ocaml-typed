@@ -86,12 +86,14 @@ let _freeVars =
   let min start fin examples rez =
     (* get lower bound of size of list *)
     let eval x =
-      let rec helper low = function
-      | Var (_,_) -> low
-      | Value List.Nil -> low
-      | Value (List.Cons (_, tl)) -> helper (low+1) tl
+      let rec helper (low,has_fresh) = function
+      | Var (_,_) -> (low, true)
+      | Value List.Nil -> (low, false)
+      | Value (List.Cons (_, tl)) -> helper (low+1,has_fresh) tl
       in
-      CConcrete (helper 0 x)
+      match helper (0,false) x with
+      | n,true -> CAtLeast n
+      | n,false -> CFixed n
     in
 
     minimize eval path_reifier rez (wrap start fin examples)

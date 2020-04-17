@@ -16,12 +16,8 @@ q=[("start", "b4"); ("b4", "c4"); ("c4", "fin")];
 q=[("start", "b5"); ("b5", "fin")];
 }
 min "start" "fin" example2, 3 answers {
-setting intial cost CConcrete (6)
+setting intial cost CFixed (6)
 q=[("start", "b1"); ("b1", "c1"); ("c1", "d1"); ("d1", "e1"); ("e1", "f1"); ("f1", "fin")];
-setting cost CConcrete (1)
+setting cost CFixed (1)
 q=[("start", "fin")];
-skipping answer with cost 5 (which is > then 1)
-skipping answer with cost 4 (which is > then 1)
-skipping answer with cost 3 (which is > then 1)
-skipping answer with cost 2 (which is > then 1)
 }

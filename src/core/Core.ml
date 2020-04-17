@@ -272,39 +272,49 @@ let structural var rr k st =
       | NonViolated -> success { st with State.prunes = new_constraints }
 
 include (struct
-  @type cost = CConcrete of GT.int | CInfinite with show
+  @type cost = CFixed of GT.int | CAtLeast of GT.int with show
   let show_cost x = GT.show cost x
 
   let minimize cost reifier var goalish state =
-    let cur_cost = ref None in
-    goalish var state  |> Stream.filter (fun st0 ->
-      let env = State.env st0 in
-      let s = State.subst st0 in
-      let reified = reifier env (Obj.magic @@ Subst.apply env s var) in
-      match cost reified, !cur_cost with
-      | c,None           ->
+    let old_cost = ref None in
+    goalish var state |> Stream.filter (fun st0 ->
+      let reified =
+        let env = State.env st0 in
+        let s = State.subst st0 in
+        reifier env (Obj.magic @@ Subst.apply env s var)
+      in
+      let c = cost reified in
+      match !old_cost with
+      | None ->
           Format.printf "setting intial cost %s\n%!" (show_cost c);
-          cur_cost := Some c;
+          old_cost := Some c;
           true
-      | c,Some CInfinite ->
-          Format.printf "setting cost %s\n%!" (show_cost c);
-          cur_cost := Some c;
-          true
-      | CInfinite,Some (CConcrete _) -> false
-      | (CConcrete cnew) as next , Some (CConcrete cold) ->
-          if cnew > cold
-          then
-            let () = Format.printf "skipping answer with cost %d (which is > then %d)\n%!" cnew cold in
-            false
-          else
-            let () =
-              Format.printf "setting cost %s\n%!" (show_cost next);
-              cur_cost := Some next
-            in
-            true
+      | Some old ->
+          match (old,c) with
+          | CFixed old,CFixed new_ when old < new_ -> false
+          | CFixed old, CFixed new_ when old = new_ -> true
+          | CFixed old, CFixed new_ ->
+              Format.printf "setting cost %s\n%!" (show_cost c);
+              old_cost := Some c;
+              true
+
+          | CAtLeast old, CFixed new_ when old < new_ -> false
+          | CAtLeast old, CFixed new_ ->
+              Format.printf "setting cost %s\n%!" (show_cost c);
+              old_cost := Some c;
+              true
+
+          | CFixed old, CAtLeast new_ when old < new_ -> false
+          | CFixed old, CAtLeast new_ -> true
+
+          | CAtLeast old, CAtLeast new_ when old < new_ -> false
+          | CAtLeast old, CAtLeast new_ ->
+              Format.printf "setting cost %s\n%!" (show_cost c);
+              old_cost := Some c;
+              true
     )
 end : sig
-  type cost = CConcrete of int | CInfinite
+  type cost = CFixed of GT.int | CAtLeast of GT.int
 
   val minimize : ('b -> cost) ->
     (Env.t -> 'logicvar -> 'b) ->
