@@ -262,6 +262,15 @@ let delay g st = Stream.from_fun (fun () -> g () st)
 
 let conj f g st = Stream.bind (f st) g
 
+let debug_var v reifier call = fun st ->
+  let xs = List.map (fun answ ->
+    reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)
+    ) (State.reify v st)
+  in
+  call xs;
+  success st
+
+
 let structural var rr k st =
   match Term.var var with
   | None -> success st
