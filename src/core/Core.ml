@@ -128,32 +128,43 @@ end = struct
   type 'b cond = 'b -> bool
   type cond_untyped = Obj.t -> bool
 
-  type t = (reifier_untyped * cond_untyped) Term.VarMap.t
+  type t = (reifier_untyped * cond_untyped) list Term.VarMap.t
 
   let empty = Term.VarMap.empty
+  let make_untyped : ('a, 'b) reifier -> 'b cond -> reifier_untyped * cond_untyped =
+    fun a b -> Obj.magic (a,b)
+
+  exception Fail
 
   let check_one map env subst term =
     try
-      let (reifier, cond) = Term.VarMap.find term map in
-      let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
-      if cond reified
-      then NonViolated
-      else Violated
+      let checkers = Term.VarMap.find term map in
+      checkers |> List.iter (fun (reifier, cond) ->
+        let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
+        if not (cond reified) then raise Fail
+      );
+      NonViolated
     with Not_found -> NonViolated
+       | Fail -> Violated
 
-  exception Fail
   let recheck ps env s =
     try
-      Term.VarMap.iter (fun k (reifier, checker) ->
-          let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
-          if not (checker reified)
-          then raise Fail
+      Term.VarMap.iter (fun k checkers ->
+          checkers |> List.iter (fun (reifier, checker) ->
+            let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
+            if not (checker reified) then raise Fail
+          )
        ) ps;
        NonViolated
     with Fail -> Violated
 
   let extend map var rr cond =
-    Term.VarMap.add (Obj.magic var) (Obj.magic (rr,cond)) map
+    let new_item = make_untyped rr cond in
+    let old =
+      try  Term.VarMap.find var map
+      with Not_found -> []
+    in
+    Term.VarMap.add (Obj.magic var) (new_item :: old) map
 
 end
 
@@ -201,7 +212,11 @@ module State =
     let diseq x y ({env; subst; ctrs; scope} as st) =
       match Disequality.add env subst ctrs x y with
       | None      -> None
-      | Some ctrs -> Some {st with ctrs}
+      | Some ctrs ->
+          match Prunes.recheck (prunes st) env subst with
+          | Prunes.Violated -> None
+          | NonViolated -> Some {st with ctrs}
+
 
     (* returns always non-empty list *)
     let reify x {env; subst; ctrs} =
