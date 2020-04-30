@@ -241,6 +241,8 @@ let mapper = object(self)
       { e with pexp_desc=Pexp_newtype(name, self#expression ee) }
     | Pexp_constraint (ee,t) ->
       { e with pexp_desc=Pexp_constraint(self#expression ee, t) }
+    | Pexp_for (p, from, to_, dir, body) ->
+      { e with pexp_desc=Pexp_for (p, self#expression from, self#expression to_, dir, self#expression body) }
     (* TODO: support all cases *)
     | _ -> e
 end
