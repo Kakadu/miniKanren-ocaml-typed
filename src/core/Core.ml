@@ -119,7 +119,7 @@ module Prunes : sig
   val empty   : t
   (* Returns false when constraints are violated *)
   val recheck : t -> Env.t -> Subst.t -> rez
-  val check_one : t -> Env.t -> Subst.t -> Term.VarTbl.key -> rez
+  val check_last : t -> Env.t -> Subst.t -> rez
   val extend  : t -> Term.VarTbl.key -> ('a, 'b) reifier -> 'b cond -> t
 end = struct
   type rez = Violated | NonViolated
@@ -128,43 +128,35 @@ end = struct
   type 'b cond = 'b -> bool
   type cond_untyped = Obj.t -> bool
 
-  type t = (reifier_untyped * cond_untyped) list Term.VarMap.t
-
-  let empty = Term.VarMap.empty
   let make_untyped : ('a, 'b) reifier -> 'b cond -> reifier_untyped * cond_untyped =
     fun a b -> Obj.magic (a,b)
 
+  type t = (Obj.t * (reifier_untyped * cond_untyped)) list
+  let empty = []
+
   exception Fail
 
-  let check_one map env subst term =
+  let check_last map env subst =
     try
-      let checkers = Term.VarMap.find term map in
-      checkers |> List.iter (fun (reifier, cond) ->
-        let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
-        if not (cond reified) then raise Fail
-      );
+      let (term, (reifier, checker)) = List.hd map in
+      let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
+      if not (checker reified) then raise Fail;
       NonViolated
     with Not_found -> NonViolated
        | Fail -> Violated
 
   let recheck ps env s =
     try
-      Term.VarMap.iter (fun k checkers ->
-          checkers |> List.iter (fun (reifier, checker) ->
-            let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
-            if not (checker reified) then raise Fail
-          )
-       ) ps;
+       ps |> List.iter (fun (k, (reifier, checker)) ->
+          let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
+          if not (checker reified) then raise Fail
+       );
        NonViolated
     with Fail -> Violated
 
-  let extend map var rr cond =
+  let extend map term rr cond =
     let new_item = make_untyped rr cond in
-    let old =
-      try  Term.VarMap.find var map
-      with Not_found -> []
-    in
-    Term.VarMap.add (Obj.magic var) (new_item :: old) map
+    (Obj.repr term, new_item) :: map
 
 end
 
@@ -217,7 +209,6 @@ module State =
           | Prunes.Violated -> None
           | NonViolated -> Some {st with ctrs}
 
-
     (* returns always non-empty list *)
     let reify x {env; subst; ctrs} =
       let answ = Subst.reify env subst x in
@@ -268,7 +259,25 @@ let unify = (===)
 
 let (=/=) x y st =
   match State.diseq x y st with
-  | Some st -> success st
+  | Some st ->
+  (*
+      let to_string z =
+        let foo ans =
+          let unctr = Answer.unctr_term ans in
+          match Env.var (State.env st) unctr with
+          | None ->
+              let tag = Obj.(tag @@ repr unctr) in
+              if tag = Obj.string_tag
+              then ((Obj.magic unctr) : string)
+              else Printf.sprintf "value with tag %d" tag
+          | Some var ->
+              Printf.sprintf "_.%d" var.Term.Var.index
+        in
+        GT.show(GT.list) foo (State.reify z st);
+      in
+      Printf.printf "disequality added: %s =/= %s\n%!" (to_string x) (to_string y);
+      *)
+      success st
   | None    -> failure st
 
 let diseq = (=/=)
@@ -286,14 +295,11 @@ let debug_var v reifier call = fun st ->
   success st
 
 
-let structural var rr k st =
-  match Term.var var with
-  | None -> success st
-  | Some v ->
-      let new_constraints = Prunes.extend (State.prunes st) v rr k in
-      match Prunes.check_one new_constraints (State.env st) (State.subst st) v with
-      | Prunes.Violated -> failure st
-      | NonViolated -> success { st with State.prunes = new_constraints }
+let structural term rr k st =
+  let new_constraints = Prunes.extend (State.prunes st) (Obj.magic term) rr k in
+  match Prunes.check_last new_constraints (State.env st) (State.subst st) with
+  | Prunes.Violated -> failure st
+  | NonViolated -> success { st with State.prunes = new_constraints }
 
 include (struct
   @type cost = CFixed of GT.int | CAtLeast of GT.int with show

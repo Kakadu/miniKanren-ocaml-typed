@@ -10,7 +10,7 @@ let rec ones out =
     ; fresh (d)
         ((!!1 % d) === out)
         (ones d)
-  ]
+    ]
 
 
 let show_int_list   = GT.(show List.ground @@ show int)
