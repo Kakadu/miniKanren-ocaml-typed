@@ -369,3 +369,13 @@ val minimize : ('b -> cost) ->
   ('logicvar -> goal) -> goal
 
 val debug_var : ('a, 'b) injected -> (('a,'b) injected -> Env.t -> 'b) -> ('b list -> unit) -> goal
+
+
+module PrunesControl : sig
+  val reset : unit -> unit
+  val enable_skips: on:bool -> unit
+  val set_max_skips: int -> unit
+  val incr : unit -> unit
+  val is_exceeded: unit -> bool
+  val skipped_prunes : unit -> int
+end

@@ -160,6 +160,61 @@ end = struct
 
 end
 
+type prines_control =
+  { mutable pc_do_skip : bool
+  ; mutable pc_checks_skipped : int
+  ; mutable pc_max_to_skip : int
+  ; mutable pc_skipped_prunes_total : int
+  }
+
+let prunes_control =
+  { pc_checks_skipped = 10; pc_do_skip=false; pc_max_to_skip = 11
+  ; pc_skipped_prunes_total = 0
+  }
+
+module PrunesControl = struct
+  let enable_skips ~on =
+(*    Printf.printf "enabling skips: %b\n%!" on;*)
+    prunes_control.pc_do_skip <- on
+  let is_enabled () = prunes_control.pc_do_skip
+  let reset_cur_counter () = prunes_control.pc_checks_skipped <- 0
+  let reset () =
+    reset_cur_counter ();
+    prunes_control.pc_skipped_prunes_total <- 0
+
+
+  let set_max_skips n =
+    assert (n>0);
+    prunes_control.pc_max_to_skip <- n;
+    reset ()
+
+  let skipped_prunes () = prunes_control.pc_skipped_prunes_total
+  let incr () =
+    if is_enabled ()
+    then
+      let () = prunes_control.pc_checks_skipped <- 1 + prunes_control.pc_checks_skipped in
+      prunes_control.pc_skipped_prunes_total <- 1 + prunes_control.pc_skipped_prunes_total
+
+
+  let is_exceeded () =
+    (not (is_enabled())) ||
+    (let ans = (prunes_control.pc_checks_skipped >= prunes_control.pc_max_to_skip) in
+(*    Printf.printf "is_exceeded = %b, cur_steps=%d, max_steps=%d\n%!"
+      ans
+      prunes_control.pc_checks_skipped
+      prunes_control.pc_max_to_skip;*)
+    ans
+    )
+end
+(*
+let do_skip_prunes = ref false
+let prunes_checks_skipped = ref 0
+let max_prunes_skipped = ref 10
+
+let set_skip_prunes_count n =
+  assert (n>0);
+  max_prunes_skipped := n
+*)
 module State =
   struct
     type t =
@@ -197,9 +252,19 @@ module State =
           match Disequality.recheck env subst ctrs prefix with
           | None      -> None
           | Some ctrs ->
-            match Prunes.recheck (prunes st) env subst with
-            | Prunes.Violated -> None
-            | NonViolated -> Some {st with subst; ctrs}
+            let next_state = {st with subst; ctrs} in
+            if PrunesControl.is_exceeded ()
+            then begin
+              let () = PrunesControl.reset_cur_counter () in
+              match Prunes.recheck (prunes next_state) env subst with
+              | Prunes.Violated -> None
+              | NonViolated -> Some next_state
+            end else begin
+(*              print_endline "check skipped";*)
+              let () = PrunesControl.incr () in
+              Some next_state
+            end
+
 
     let diseq x y ({env; subst; ctrs; scope} as st) =
       match Disequality.add env subst ctrs x y with
