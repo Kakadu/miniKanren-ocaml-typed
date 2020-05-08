@@ -115,6 +115,7 @@ let option_bind ~f = function Some x -> f x | None -> None
 
 exception Not_an_ident
 let reconstruct_args e =
+  let open Longident in
   let are_all_idents (xs: (_*expression) list) =
     try Some (List.map xs ~f:(fun (_,e) ->
                         match e.pexp_desc with
@@ -127,9 +128,11 @@ let reconstruct_args e =
      (* fresh (var1 var2 var3) body *)
       option_map (are_all_idents ys) ~f:(fun xs -> arg1::xs )
 
-  | Pexp_ident {txt=Longident.Lident arg1; _} ->
-     (* fresh arg0 body *)
-     Some [arg1]
+  (* no fresh variables: just for geting rid of &&&  *)
+  | Pexp_construct ({ txt=Lident "()" }, None) -> Some []
+  (* [fresh arg0 body] -- single fresh variable  *)
+  | Pexp_ident {txt=Lident arg1; _} ->  Some [arg1]
+
   | _ -> None
 
 
@@ -180,7 +183,7 @@ let mapper = object(self)
     | Pexp_apply (e1,[args]) when is_fresh e1 ->
         (* bad syntax -- no body*)
         e
-    | Pexp_apply (e1, (_,args) :: body) when is_fresh e1 -> begin
+    | Pexp_apply (e1, (Nolabel,args) :: body) when is_fresh e1 -> begin
         assert (List.length body > 0);
         let body = List.map ~f:snd body in
 
