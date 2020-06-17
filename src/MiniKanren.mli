@@ -84,7 +84,7 @@ val logic :
      foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic 
-   >) GT.t
+   >, 'y -> 'zz) GT.t
 
 (** Injecting values into logics *)
 val (!!) : 'a -> 'a logic
@@ -132,7 +132,8 @@ module Bool :
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
          html    : ground -> HTML.viewer;
-         show    : ground -> string >)
+         show    : ground -> string >,
+         'c -> 'd)
       GT.t 
 
     (** Logic boolean *)
@@ -147,7 +148,7 @@ module Bool :
          foldr   : 'a -> logic -> 'a;
          gmap    : logic -> logic;
          html    : logic -> HTML.viewer;
-         show    : logic -> string >)
+         show    : logic -> string >, 'c -> 'd)
       GT.t
 
     (** Sheffer stroke *)
@@ -194,7 +195,7 @@ module Nat :
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
          html    : ground -> HTML.viewer;
-         show    : ground -> string >)
+         show    : ground -> string >, 'c -> 'd)
       GT.t
 
     (** Logic nat *)
@@ -209,7 +210,7 @@ module Nat :
          foldr   : 'a -> logic -> 'a;
          gmap    : logic -> logic;
          html    : logic -> HTML.viewer;
-         show    : logic -> string >)
+         show    : logic -> string >, float)
       GT.t
 
     (** [of_int n] converts integer [n] into [ground]; negtive
@@ -284,7 +285,7 @@ module List :
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
          gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
          html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
-         show    : ('a -> string) -> 'a ground -> string >)
+         show    : ('a -> string) -> 'a ground -> string >, 'c -> 'd)
       GT.t
 
     (** [of_list l] makes ground list from a regular one *)
@@ -305,7 +306,7 @@ module List :
          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b; 
          gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
-         show    : ('a -> string) -> 'a logic -> GT.string >)
+         show    : ('a -> string) -> 'a logic -> GT.string >, 'c -> 'd)
       GT.t 
 
     (** List injection *)

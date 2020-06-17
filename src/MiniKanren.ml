@@ -40,7 +40,7 @@ module Stream =
       else match s with
            | Nil          -> [], s
            | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
-           | Lazy  z      -> retrieve ~n:n (Lazy.force z)            
+           | Lazy  z      -> retrieve ~n:n (Lazy.force z)
 
     let take ?(n=(-1)) s = fst @@ retrieve ~n:n s
 
@@ -89,8 +89,9 @@ let (!!!) = Obj.magic;;
 
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
 
-let logic = {logic with 
-  gcata = (); 
+let logic = {
+  GT.gcata = ();
+  GT.fix = (fun _ -> assert false);
   plugins = 
     object 
       method html    = logic.plugins#html
@@ -100,18 +101,18 @@ let logic = {logic with
       method foldl   = logic.plugins#foldl
       method gmap    = logic.plugins#gmap    
       method show fa x = 
-        GT.transform(logic) 
-           (GT.lift fa) 
-           (object inherit ['a] @logic[show]              
+        GT.transform(logic)            
+           (fun fself -> object
+              inherit ['a, _] @logic[show]  (GT.lift fa)  fself
               method c_Var _ s _ i cs = 
                 let c =
                   match cs with 
                   | [] -> ""
-                  | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
+                  | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ fself () l) cs)
                 in
                 Printf.sprintf "_.%d%s" i c
                 
-              method c_Value _ _ x = x.GT.fx ()
+              method c_Value _ _ x = fa x
             end) 
            () 
            x
@@ -124,7 +125,7 @@ let destruct = function
 | Var (_, i, c) -> `Var (i, c)
 | Value x       -> `Value x
 
-exception Not_a_value 
+exception Not_a_value
 
 let (!!) x = Value x
 let inj = (!!)
@@ -239,7 +240,7 @@ module Subst :
 
     let of_list l = List.fold_left (fun s (i, v, t) -> M.add i (v, t) s) empty l
 
-    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], []) 
+    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
 
     let rec walk env var subst =
       match Env.var env var with
@@ -274,7 +275,7 @@ module Subst :
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst 
+            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
             | Some xi, _       -> extend xi x y delta subst 
             | _      , Some yi -> extend yi y x delta subst 
             | _ ->
@@ -314,7 +315,7 @@ module State =
     let show (env, subst, constr, _) = Printf.sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
   end
 
-let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c, _) as st) x ->  
+let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c, _) as st) x ->
   let rec walk' recursive env var subst =
     let var = Subst.walk env var subst in
     match Env.var env var with
@@ -334,12 +335,12 @@ let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c, _) as st) x ->
            !!!var
          | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
         )
-    | Some i when recursive ->        
+    | Some i when recursive ->
         (match var with
          | Var (a, i, _) -> 
             let cs = 
               List.fold_left 
-                (fun acc s -> 
+                (fun acc s ->
                    match walk' false env (!!!var) s with
                    | Var (_, j, _) when i = j -> acc
                    | t -> (refine st t) :: acc
@@ -371,7 +372,7 @@ let (===) x y (env, subst, constr, h) =
         try
           (* TODO: only apply constraints with the relevant vars *)
           let constr' =
-            List.fold_left (fun css' cs -> 
+            List.fold_left (fun css' cs ->
               let x, t  = Subst.split cs in
               try
                 let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
@@ -583,6 +584,7 @@ module Bool =
 
     let ground = {
       GT.gcata = ();
+      GT.fix = (fun _ -> assert false);
       GT.plugins = 
         object(this) 
           method html    n   = GT.html   (GT.bool) n
@@ -599,6 +601,7 @@ module Bool =
 
     let logic = {
       GT.gcata = ();
+      GT.fix = (fun _ -> assert false);
       GT.plugins = 
         object(this) 
           method html    n   = GT.html   (logic') (GT.html   (ground)) n
@@ -626,7 +629,7 @@ module Bool =
     let noto a = noto' a !true
 
     let oro a b c = 
-      Fresh.two (fun aa bb ->      
+      Fresh.two (fun aa bb ->
         ((a  |^ a) aa) &&&
         ((b  |^ b) bb) &&&
         ((aa |^ bb) c)
@@ -655,6 +658,7 @@ module Nat =
 
     let ground = {
       GT.gcata = ();
+      GT.fix = (fun _ -> assert false);
       GT.plugins = 
         object(this) 
           method html    n = GT.html   (lnat) this#html    n
@@ -671,15 +675,16 @@ module Nat =
 
     let logic = {
       GT.gcata = ();
+      GT.fix = 0.0;
       GT.plugins = 
         object(this) 
-          method html    n   = GT.html   (logic') (GT.html   (lnat) this#html   ) n
-          method eq      n m = GT.eq     (logic') (GT.eq     (lnat) this#eq     ) n m
-          method compare n m = GT.compare(logic') (GT.compare(lnat) this#compare) n m
-          method foldr   a n = GT.foldr  (logic') (GT.foldr  (lnat) this#foldr  ) a n
-          method foldl   a n = GT.foldl  (logic') (GT.foldl  (lnat) this#foldl  ) a n
-          method gmap    n   = GT.gmap   (logic') (GT.gmap   (lnat) this#gmap   ) n
-          method show    n   = GT.show   (logic') (GT.show   (lnat) this#show   ) n
+          method html    (n: logic)   = GT.html   (logic') (GT.html   (lnat) this#html   ) n
+          method eq      (n: logic) m = GT.eq     (logic') (GT.eq     (lnat) this#eq     ) n m
+          method compare (n: logic) m = GT.compare(logic') (GT.compare(lnat) this#compare) n m
+          method foldr   a (n: logic) = GT.foldr  (logic') (GT.foldr  (lnat) this#foldr  ) a n
+          method foldl   a (n: logic) = GT.foldl  (logic') (GT.foldl  (lnat) this#foldl  ) a n
+          method gmap    (n: logic) : logic  = GT.gmap   (logic') (GT.gmap   (lnat) this#gmap   ) n
+          method show    (n: logic)   = GT.show   (logic') (GT.show   (lnat) this#show   ) n
         end
     }
 
@@ -725,7 +730,7 @@ module Nat =
     let rec leo x y b =
       conde [
         (x === !O) &&& (b === !true);
-        Fresh.two (fun x' y' -> 
+        Fresh.two (fun x' y' ->
           conde [
             (x === !(S x')) &&& (y === !(S y')) &&& (leo x' y' b)           
           ]
@@ -745,11 +750,11 @@ module Nat =
     
   end
 
-let rec inj_nat n = 
+let rec inj_nat n =
   if n <= 0 then inj O
   else inj (S (inj_nat @@ n-1))
 
-let rec prj_nat n = 
+let rec prj_nat n =
   match prj n with
   | O   -> 0
   | S n -> 1 + prj_nat n
@@ -789,56 +794,61 @@ module List =
 
     let ground = {
       GT.gcata = ();
+      GT.fix = (fun _ -> assert false);
       GT.plugins = 
-        object(this) 
+        object(this)
           method html    fa l = GT.html   (llist) fa (this#html    fa) l
           method eq      fa l = GT.eq     (llist) fa (this#eq      fa) l
           method compare fa l = GT.compare(llist) fa (this#compare fa) l
           method foldr   fa l = GT.foldr  (llist) fa (this#foldr   fa) l
           method foldl   fa l = GT.foldl  (llist) fa (this#foldl   fa) l
           method gmap    fa l = GT.gmap   (llist) fa (this#gmap    fa) l
+(*          method fmt     fa fmt (xs : _ ground) =
+            Format.fprintf fmt "@[[";
+            GT.foldl ground (fun () -> Format.fprintf fmt "%a;@ " fa) () xs;
+            Format.fprintf fmt "]@]"*)
           method show    fa l = "[" ^
             let rec inner l =
-              (GT.transform(llist) 
-                 (GT.lift fa)
-                 (GT.lift inner)
-                 (object inherit ['a,'a ground] @llist[show]
+              (GT.transform(llist)
+                 (fun fself -> object inherit ['a,'a ground,_]  @llist[show] (GT.lift fa) (GT.lift inner) fself
                     method c_Nil   _ _      = ""
-                    method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                  end) 
-                 () 
+                    method c_Cons  i s x xs = (fa x) ^ (match xs with Nil -> "" | _ -> "; " ^ (inner xs) )
+                  end)
+                 ()
                  l
-              ) 
+              )
             in inner l ^ "]"
         end
     }
 
     let logic = {
       GT.gcata = ();
+      GT.fix = (fun _ -> assert false);
       GT.plugins = 
-        object(this) 
-          method html    fa l   = GT.html   (logic') (GT.html   (llist) fa (this#html    fa)) l
-          method eq      fa a b = GT.eq     (logic') (GT.eq     (llist) fa (this#eq      fa)) a b
-          method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b
-          method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l 
-          method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l 
-          method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l 
-          method show    fa l = 
+        object(this)
+          method compare fa (l: _ logic) = GT.compare (logic') (GT.compare (llist) fa (this#compare fa)) l
+          method gmap    fa (l: _ logic) : _ logic = GT.gmap    (logic') (GT.gmap    (llist) fa (this#gmap    fa)) l
+          method eq      fa (l: _ logic) = GT.eq      (logic') (GT.eq      (llist) fa (this#eq      fa)) l
+          method foldl   fa l = GT.foldl   (logic') (GT.foldl   (llist) fa (this#foldl   fa)) l
+          method foldr   fa l = GT.foldr   (logic') (GT.foldr   (llist) fa (this#foldr   fa)) l
+          method html    fa (l: _ logic) = GT.html    (logic') (GT.html    (llist) fa (this#html    fa)) l
+(*          method fmt fa fmt (l: _ logic) = Format.fprintf fmt "%s" (this#show (Format.asprintf "%a" fa) l)*)
+          method show fa (l: _ logic) =
             GT.show(logic')
-              (fun l -> "[" ^            
-                 let rec inner l =
-                   (GT.transform(llist) 
-                      (GT.lift fa)
-                      (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] @llist[show]
-                         method c_Nil   _ _      = ""
-                         method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                       end) 
-                      () 
+              (fun l -> "[" ^
+                  let rec inner l =
+                    GT.transform(llist)
+                      (fun fself ->
+                          object
+                             inherit ['a,'a logic, _] @llist[show] (GT.lift fa) (GT.lift (GT.show(logic') inner)) fself
+                             method c_Nil   _ _      = ""
+                             method c_Cons  i s x xs =
+                               (fa x) ^ (match xs with Value Nil -> "" | _ -> "; " ^ (GT.show(logic') inner xs))
+                          end)
+                      ()
                       l
-                   ) 
-                 in inner l ^ "]"
-              ) 
+                   in inner l ^ "]"
+              )
               l
         end
     }
@@ -1008,7 +1018,7 @@ module LogicAdder =
 
 let one () = (fun x -> LogicAdder.(succ zero) x), (@@), ApplyLatest.two
 
-let succ n () = 
+let succ n () =
   let adder, currier, app = n () in
   (LogicAdder.succ adder, Uncurry.succ currier, ApplyLatest.succ app)
 
