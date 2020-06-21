@@ -37,40 +37,74 @@ module Binding =
     let hash {var; term} = Hashtbl.hash (Term.Var.hash var, Term.hash term)
   end
 
-type t = Term.t Term.VarMap.t
+type t = { mutable mapa : Term.t Term.VarMap.t }
 
-let empty = Term.VarMap.empty
+let of_map mapa = { mapa }
 
-let of_list =
-  ListLabels.fold_left ~init:empty ~f:(let open Binding in fun subst {var; term} ->
+let empty = of_map Term.VarMap.empty
+
+let of_list xs =
+  of_map @@
+  ListLabels.fold_left xs ~init:Term.VarMap.empty ~f:(let open Binding in fun subst {var; term} ->
     if not @@ Term.VarMap.mem var subst then
       Term.VarMap.add var term subst
     else
       invalid_arg "OCanren fatal (Subst.of_list): invalid substituion"
   )
 
-let of_map m = m
-
-let split s = Term.VarMap.fold (fun var term xs -> Binding.({var; term})::xs) s []
+let split { mapa } = Term.VarMap.fold (fun var term xs -> Binding.({var; term})::xs) mapa []
 
 type lterm = Var of Term.Var.t | Value of Term.t
 
-let rec walk env subst x =
+let print_subst (subst : t) =
+  Term.VarMap.iter (fun k v ->
+    Printf.printf "\t%s -> %s\n%!" (Term.show @@ Obj.magic k) (Term.show @@ Obj.magic  v)
+  ) subst.mapa
+
+let walkt_c = ref 0
+let walkv_c = ref 0
+
+let clear_counters () =
+  walkt_c := 0;
+  walkv_c := 0;
+  ()
+
+(*let walkt_c_inc () = incr walkt_c*)
+let report_counters () =
+  Printf.printf "walkt count = %d\n%!" !walkt_c;
+  Printf.printf "walkv count = %d\n%!" !walkv_c
+
+let rec walk env (subst : t) x =
   (* walk var *)
-  let rec walkv env subst v =
+  let rec walkv env subst v : lterm =
+    incr walkv_c;
     VarEnv.check_exn env v;
     match v.Term.Var.subst with
     | Some term -> walkt env subst (Obj.magic term)
     | None ->
-        try walkt env subst (Term.VarMap.find v subst)
+        try
+          let next = Term.VarMap.find v subst.mapa in
+          let ans = walkt env subst next in
+          let () =
+            match ans with
+            | Var x   -> ()
+(*            subst.mapa <- Term.VarMap.add v  (Obj.magic x)  subst.mapa*)
+            | Value x -> subst.mapa <- Term.VarMap.add v  (Obj.magic x)  subst.mapa
+          in
+          ans
         with Not_found -> Var v
   (* walk term *)
-  and walkt env subst t =
+  and walkt env subst t : lterm =
+    incr walkt_c;
     match VarEnv.var env t with
     | Some v -> walkv env subst v
     | None   -> Value t
   in
-  walkv env subst x
+  let ans = walkv env subst x in
+(*  Printf.printf "walk finished: %s\n%!" (Term.show @@ Obj.repr x);*)
+(*  print_subst subst;*)
+(*  Printexc.print_backtrace stdout;*)
+  ans
 
 (* same as [Term.map] but performs [walk] on the road *)
 let map ~fvar ~fval env subst x =
@@ -104,10 +138,16 @@ let fold ~fvar ~fval ~init env subst x =
 
 exception Occurs_check
 
-let rec occurs env subst var term =
-  iter env subst term
-    ~fvar:(fun v -> if Term.Var.equal v var then raise Occurs_check)
-    ~fval:(fun x -> ())
+let occurs =
+  try
+    let _ = Sys.getenv "OCANREN_NO_OCCURS" in
+    (fun _ _ _ _ -> ())
+  with
+    | Not_found ->
+      (fun env subst var term ->
+        iter env subst term
+          ~fvar:(fun v -> if Term.Var.equal v var then raise Occurs_check)
+          ~fval:(fun x -> ()))
 
 let extend ~scope env subst var term  =
   (* if occurs env subst var term then raise Occurs_check *)
@@ -121,13 +161,14 @@ let extend ~scope env subst var term  =
    * 2) If we do unification after a fresh, then in case of failure it doesn't matter if
    *    the variable is be distructively substituted: we will not look on it in future.
    *)
-  if (scope = var.scope) && (scope <> Term.Var.non_local_scope)
+(*  if (scope = var.scope) && (scope <> Term.Var.non_local_scope)*)
+  if false
   then begin
     var.subst <- Some (Obj.repr term);
     subst
   end
     else
-      Term.VarMap.add var (Term.repr term) subst
+      { mapa = Term.VarMap.add var (Term.repr term) subst.mapa }
 
 exception Unification_failed
 
@@ -172,28 +213,31 @@ let apply env subst x = Obj.magic @@
 let freevars env subst x =
   VarEnv.freevars env @@ apply env subst x
 
-let is_bound = Term.VarMap.mem
+let is_bound x { mapa } = Term.VarMap.mem x mapa
 
-let merge env subst1 subst2 = Term.VarMap.fold (fun var term -> function
-  | Some s  -> begin
-    match unify env s (Obj.magic var) term with
-    | Some (_, s') -> Some s'
-    | None         -> None
-    end
-  | None    -> None
-) subst1 (Some subst2)
+let merge env { mapa = subst1 } (subst2 : t) =
+  Term.VarMap.fold (fun var term -> function
+    | Some s  -> begin
+      match unify env s (Obj.magic var) term with
+      | Some (_, s') -> Some s'
+      | None         -> None
+      end
+    | None    -> None
+  ) subst1 (Some subst2)
+(*  |> (function None -> None | Some x -> Some (of_map x))*)
 
-let merge_disjoint env =
+let merge_disjoint env { mapa = m1} { mapa = m2 } =
   Term.VarMap.union (fun _ _ ->
     invalid_arg "OCanren fatal (Subst.merge_disjoint): substitutions intersect"
-  )
+  ) m1 m2
+  |> of_map
 
-let subsumed env subst =
+let subsumed env subst m =
   Term.VarMap.for_all (fun var term ->
     match unify env subst (Obj.magic var) term with
     | Some ([], _)  -> true
     | _             -> false
-  )
+  ) m.mapa
 
 module Answer =
   struct

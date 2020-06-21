@@ -361,3 +361,11 @@ module Tabling :
 
 (** Identity (can be used in [run] to return the stream unchanged) *)
 val id : 'a -> 'a
+
+val clear_counters : unit -> unit
+val report_counters : unit -> unit
+
+
+val trace1 : string -> ('a,'b) injected ->
+  (Format.formatter -> ('a,'b) Logic.reified -> unit) ->
+  goal

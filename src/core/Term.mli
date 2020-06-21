@@ -33,7 +33,7 @@ module Var :
         index         : int;
         mutable subst : Obj.t option;
         scope         : scope;
-        constraints   : Obj.t list
+        constraints   : Obj.t list (* WTF are the constraints ???? *)
       }
 
     val tabling_env : env

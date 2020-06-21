@@ -263,7 +263,7 @@ let rec compare x y =
   try
     fold2 x y ~init:0
       ~fvar:(fun acc v u ->
-        if acc <> 0 then acc
+        if acc <> 0 then acc (* TODO: make more effective *)
         else
           let acc = Var.compare v u in
           if acc <> 0 then acc

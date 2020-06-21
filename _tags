@@ -18,6 +18,8 @@ true: short_paths
 <regression/test*.ml> : syntax(camlp5o), package(logger.syntax)
 <regression/test0*.ml> : use_pa_ocanren, package(GT.syntax.all)
 
+<regression/test023len.*>: package(mtime.clock.os)
+
 ####################################################################
 <ppxnew/pp_distrib.*>:    package(ppxlib,GT.ppx_gt), link_ppx_distrib, link_ppx_gt, linkall
 <ppxnew/pp_noinjected.*>: package(ppxlib),           link_ppx_noinjected, linkall

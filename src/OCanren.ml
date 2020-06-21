@@ -64,4 +64,7 @@ module Std =
 
     let structural = Core.structural
 
+    let clear_counters = Core.clear_counters
+    let report_counters = Core.report_counters
+    let trace1 = Core.trace1
   end

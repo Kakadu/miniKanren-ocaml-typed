@@ -187,13 +187,13 @@ module State =
     let unify x y ({env; subst; ctrs; scope} as st) =
         match VarSubst.unify ~scope env subst x y with
         | None -> None
-        | Some (prefix, subst) ->
-          match Disequality.recheck env subst ctrs prefix with
+        | Some (prefix, subst) -> Some {st with subst}
+          (*match Disequality.recheck env subst ctrs prefix with
           | None      -> None
           | Some ctrs ->
             match Prunes.recheck (prunes st) env subst with
             | Prunes.Violated -> None
-            | NonViolated -> Some {st with subst; ctrs}
+            | NonViolated -> Some {st with subst; ctrs}*)
 
     let diseq x y ({env; subst; ctrs; scope} as st) =
       match Disequality.add env subst ctrs x y with
@@ -201,6 +201,7 @@ module State =
       | Some ctrs -> Some {st with ctrs}
 
     let reify x {env; subst; ctrs} =
+(*      VarSubst.print_subst subst;*)
       let answ = VarSubst.reify env subst x in
       let diseqs = Disequality.reify env subst ctrs x in
       if List.length diseqs = 0 then
@@ -232,6 +233,20 @@ module State =
       )
   end
 
+module C = struct
+  let c = ref 0
+  let inc () = c := !c+1
+
+end
+
+let clear_counters ()  =
+  C.c := 0;
+  VarSubst.clear_counters ()
+
+let report_counters () =
+  VarSubst.report_counters ();
+  Printf.printf "unif counters = %d\n%!" !C.c
+
 let (!!!) = Obj.magic
 
 type 'a goal' = State.t -> 'a
@@ -241,20 +256,40 @@ type goal = State.t RStream.t goal'
 let success st = RStream.single st
 let failure _  = RStream.nil
 
-let (===) x y st =
+let unify x y st =
   match State.unify x y st with
   | Some st -> success st
   | None    -> failure st
 
-let unify = (===)
-          
+let (===) =
+  try
+    let _ = Sys.getenv "OCANREN_DEBUG" in
+    !!!(fun x y st ->
+      C.inc();
+      unify x y st)
+  with
+    | Not_found -> !!!unify
+
 let (=/=) x y st =
   match State.diseq x y st with
   | Some st -> success st
   | None    -> failure st
 
 let diseq = (=/=)
-          
+
+
+let trace1 msg var func st =
+(*  let answers : Answer.t list = State.reify var st in*)
+  let answers : Answer.t list = [] in
+  Format.printf "%s: [" msg;
+  List.iter (fun x ->
+    func Format.std_formatter (Logic.make_rr (State.env st) !!!(Answer.ctr_term x));
+    Format.fprintf Format.std_formatter "; "
+  ) answers;
+  Format.printf "]\n%!";
+  RStream.single st
+
+
 let delay g st = RStream.from_fun (fun () -> g () st)
 
 let conj f g st = RStream.bind (f st) g

@@ -82,3 +82,9 @@ module Answer :
   end
 
 val reify : VarEnv.t -> t -> 'a -> Answer.t
+
+
+val clear_counters : unit -> unit
+val report_counters : unit -> unit
+
+val print_subst : t -> unit
