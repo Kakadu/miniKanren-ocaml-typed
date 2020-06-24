@@ -247,7 +247,16 @@ let mapper = object(self)
     | Pexp_for (p, from, to_, dir, body) ->
       { e with pexp_desc=Pexp_for (p, self#expression from, self#expression to_, dir, self#expression body) }
     (* TODO: support all cases *)
+    | Pexp_function cases -> { e with pexp_desc = Pexp_function (List.map ~f:self#case cases) }
+    | Pexp_match (s, cases) ->
+        let scru = self#expression s in
+        { e with pexp_desc = Pexp_match (scru, List.map ~f:self#case cases) }
+
+    | Pexp_ident _ -> e
     | _ -> e
+    | _ ->
+      Pprintast.expression Caml.Format.std_formatter e;
+      assert false
 end
 
 let () =
