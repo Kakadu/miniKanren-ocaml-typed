@@ -18,11 +18,16 @@
 
 type t
 
+exception Disequality_violated
+
 (* [empty] empty disequality constraint store *)
 val empty  : t
 
 (* [add env subst diseq x y] adds constraint [x =/= y] into disequality constraint store *)
 val add : Env.t -> Subst.t -> t -> 'a -> 'a -> t option
+
+(* the same as [add] but raises [Disequality_violated] if can't *)
+val add_exn : Env.t -> Subst.t -> t -> 'a -> 'a -> t
 
 (* [recheck env subst diseq bindings] - checks that disequality is not violated in refined substitution.
  *   [bindings] is a substitution prefix, i.e. new bindings obtained during unification.

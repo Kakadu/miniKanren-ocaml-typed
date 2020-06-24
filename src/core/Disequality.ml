@@ -91,7 +91,8 @@ module Disjunct :
     (* Disjunction.t is a set of single disequalities joint by disjunction *)
     type t
 
-    (* [make env subst x y] creates new disjunct from the disequality [x =/= y] *)
+    (* [make env subst x y] creates new disjunct from the disequality [x =/= y].
+     * May raise exceptions [Disequality_violated] or [Disequality_fulfilled] *)
     val make : Env.t -> Subst.t -> 'a -> 'a -> t
 
     (* [sample disj] returns an index of variable involved in some disequality inside disjunction *)
@@ -146,6 +147,20 @@ module Disjunct :
     let make env subst x y =
       match refine env subst x y with
       | Refined delta -> of_list delta
+(*
+          let f =
+            let open Subst.Binding in
+            fun {var; term} ->
+              Printf.sprintf "_.%d =/= %s" (var.Term.Var.index)
+                ( let t = Obj.(tag @@ repr term) in
+                  if t = Obj.string_tag
+                  then ( (Obj.magic term) : string)
+                  else "value"
+                )
+          in
+(*          Printf.printf "Created disjunct: %s\n%!"
+            (GT.show GT.list f delta);*)
+*)
       | Fulfiled      -> raise Disequality_fulfilled
       | Violated      -> raise Disequality_violated
 
@@ -232,7 +247,7 @@ module Conjunct :
   end = struct
     let next_id = ref 0
 
-    module M = Map.Make(struct type t = int let compare = (-) end)
+    module M = Map.Make(struct type t = int let compare: int -> int -> int = Stdlib.compare end)
 
     type t = Disjunct.t M.t
 
@@ -362,11 +377,16 @@ let merge_disjoint env subst = Term.VarMap.union (fun _ c1 c2 ->
 
 let update env subst conj = merge_disjoint env subst (Conjunct.split conj)
 
+let add_exn env subst cstore x y =
+  try
+    update env subst (Conjunct.make env subst x y) cstore
+  with
+    | Disequality_fulfilled -> cstore
+
 let add env subst cstore x y =
   try
-    Some (update env subst (Conjunct.make env subst x y) cstore)
+    Some (add_exn env subst cstore x y)
   with
-    | Disequality_fulfilled -> Some cstore
     | Disequality_violated  -> None
 
 let recheck env subst cstore bs =
