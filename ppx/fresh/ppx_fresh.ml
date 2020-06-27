@@ -251,9 +251,10 @@ let mapper = object(self)
     | Pexp_match (s, cases) ->
         let scru = self#expression s in
         { e with pexp_desc = Pexp_match (scru, List.map ~f:self#case cases) }
-
+    | Pexp_letmodule (name, me, body) ->
+        { e with pexp_desc = Pexp_letmodule (name, me, self#expression body) }
     | Pexp_ident _ -> e
-    | _ -> e
+(*    | _ -> e*)
     | _ ->
       Pprintast.expression Caml.Format.std_formatter e;
       assert false
