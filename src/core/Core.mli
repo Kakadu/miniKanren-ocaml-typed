@@ -368,7 +368,7 @@ val minimize : ('b -> cost) ->
   (('a, 'b) injected as 'logicvar) ->
   ('logicvar -> goal) -> goal
 
-val debug_var : ('a, 'b) injected -> (('a,'b) injected -> Env.t -> 'b) -> ('b list -> unit) -> goal
+val debug_var : ('a, 'b) injected -> (('a,'b) injected -> Env.t -> 'b) -> ('b list -> goal) -> goal
 
 val only_head : goal -> goal
 

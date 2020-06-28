@@ -361,8 +361,8 @@ let debug_var v reifier call = fun st ->
     reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)
     ) (State.reify v st)
   in
-  call xs;
-  success st
+  call xs st
+
 
 
 let structural term rr k st =
