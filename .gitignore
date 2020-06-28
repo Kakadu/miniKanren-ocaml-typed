@@ -9,4 +9,6 @@ _build
 /MiniKanren.docdir
 /node_modules
 .merlin
+/oc-qtc*
+/qtc*
 
