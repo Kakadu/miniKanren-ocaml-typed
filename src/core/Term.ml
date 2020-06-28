@@ -72,7 +72,10 @@ module Var =
       (x.index = y.index) && (x.env = y.env)
 
     let compare x y =
-      if x.index <> y.index then x.index - y.index else x.env - y.env
+      let compare_int = (compare: int -> int -> int) in
+      let r = compare_int x.index y.index in
+      if r<>0 then r
+      else compare_int x.env y.env
 
     let hash x = Hashtbl.hash (x.env, x.index)
 
