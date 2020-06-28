@@ -265,19 +265,23 @@ let rec equal x y =
 
 let compare' = compare
 
+exception CompareRez of int
+
 let rec compare x y =
   try
     fold2 x y ~init:0
       ~fvar:(fun acc v u ->
-        if acc <> 0 then acc
+        if acc <> 0 then (raise (CompareRez acc))
         else
           let acc = Var.compare v u in
-          if acc <> 0 then acc
+          if acc <> 0 then (raise (CompareRez acc))
           else List.fold_left2 (fun acc x y -> if acc <> 0 then acc else compare x y) 0 v.Var.constraints u.Var.constraints
       )
       ~fval:(fun acc x y -> if acc <> 0 then acc else (compare' x y))
       ~fk:(fun _ _ _ _ -> -1)
-  with Different_shape (tx, ty) -> compare' tx ty
+  with
+    | Different_shape (tx, ty) -> compare' tx ty
+    | CompareRez n -> n
 
 let rec hash x = fold x ~init:1
   ~fvar:(fun acc v -> Hashtbl.hash (Var.hash v, List.fold_left (fun acc x -> Hashtbl.hash (acc, hash x)) acc v.Var.constraints))
