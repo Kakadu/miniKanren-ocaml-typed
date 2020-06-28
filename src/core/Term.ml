@@ -133,17 +133,32 @@ let var x =
   else None
 
 let rec map ~fvar ~fval x =
+  let copier last obj =
+    (* The idea: we make a full copy value only we actually need to change a field.
+       When mapping doesn't change a value it would be better to return previous value.
+    *)
+    let rec helper i o is_clone =
+      if i>last then o
+      else
+        let field = Obj.field o i in
+        let new_field = map ~fvar ~fval field in
+        if field == new_field
+        then helper (1+i) o is_clone
+        else
+          let new_obj = if is_clone then o else Obj.dup o in
+          let () = Obj.set_field new_obj i new_field in
+          helper (i+1) new_obj true
+    in
+    helper 0 obj false
+  in
+
   let tx = Obj.tag x in
   if (is_box tx) then
     let sx = Obj.size x in
     if is_var tx sx x then
       fvar @@ Obj.magic x
     else
-      let y = Obj.dup x in
-      for i = 0 to sx - 1 do
-        Obj.set_field y i @@ map ~fvar ~fval (Obj.field x i)
-      done;
-      y
+      copier (sx-1) x
   else begin
     is_valid_tag_exn tx;
     fval x
