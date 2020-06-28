@@ -370,6 +370,7 @@ val minimize : ('b -> cost) ->
 
 val debug_var : ('a, 'b) injected -> (('a,'b) injected -> Env.t -> 'b) -> ('b list -> unit) -> goal
 
+val only_head : goal -> goal
 
 module PrunesControl : sig
   val reset : unit -> unit

@@ -68,5 +68,6 @@ module Std =
     type cost = Core.cost = CFixed of GT.int | CAtLeast of GT.int
     let minimize  = Core.minimize
     let debug_var = Core.debug_var
+    let only_head = Core.only_head
 
   end
