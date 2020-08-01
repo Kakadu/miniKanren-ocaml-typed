@@ -259,6 +259,7 @@ module State =
       ; ctrs  : Disequality.t
       ; prunes: Prunes.t
       ; scope : Term.Var.scope
+      ; fd    : FM.t
       }
 
     type reified = Env.t * Term.t
@@ -269,6 +270,7 @@ module State =
       ; ctrs  = Disequality.empty
       ; prunes = Prunes.empty
       ; scope = Term.Var.new_scope ()
+      ; fd = FM.empty ()
       }
 
     let env   {env} = env
@@ -276,30 +278,30 @@ module State =
     let constraints {ctrs} = ctrs
     let scope {scope} = scope
     let prunes {prunes} = prunes
+    let fds {fd} = fd
 
     let fresh {env; scope} = Env.fresh ~scope env
 
     let new_scope st = {st with scope = Term.Var.new_scope ()}
 
-    let unify x y ({env; subst; ctrs; scope} as st) =
-        match Subst.unify ~scope env subst x y with
-        | None -> None
-        | Some (prefix, subst) ->
-          match Disequality.recheck env subst ctrs prefix with
-          | None      -> None
-          | Some ctrs ->
-            let next_state = {st with subst; ctrs} in
-            if PrunesControl.is_exceeded ()
-            then begin
-              let () = PrunesControl.reset_cur_counter () in
-              match Prunes.recheck (prunes next_state) env subst with
-              | Prunes.Violated -> None
-              | NonViolated -> Some next_state
-            end else begin
-(*              print_endline "check skipped";*)
-              let () = PrunesControl.incr () in
-              Some next_state
-            end
+    let unify x y ({env; subst; ctrs; scope; fd } as st) =
+      let (>>=?) x f  = match x with Some a -> f a | None -> None in
+
+      Subst.unify ~scope env subst x y          >>=? fun (prefix, subst) ->
+      Disequality.recheck env subst ctrs prefix >>=? fun ctrs ->
+      FM.recheck env subst fd prefix            >>=? fun fd ->
+        let next_state = { st with subst; ctrs; fd } in
+        if PrunesControl.is_exceeded ()
+        then begin
+          let () = PrunesControl.reset_cur_counter () in
+          match Prunes.recheck (prunes next_state) env subst with
+          | Prunes.Violated -> None
+          | NonViolated -> Some next_state
+        end else begin
+  (*              print_endline "check skipped";*)
+          let () = PrunesControl.incr () in
+          Some next_state
+        end
 
 
     let diseq x y ({env; subst; ctrs; scope} as st) =
@@ -342,6 +344,7 @@ module State =
         )
   end
 
+
 let (!!!) = Obj.magic
 
 type 'a goal' = State.t -> 'a
@@ -355,6 +358,29 @@ let only_head g st =
   let stream = g st in
   try Stream.single @@ Stream.hd stream
   with Failure _ -> Stream.nil
+
+module FD = struct
+  let lt a b st =
+    match FM.lt a b (State.fds st) with
+    | None -> failure ()
+    | Some fd -> success {st with State.fd = fd }
+
+  let eq a b st =
+    match FM.eq a b (State.fds st) with
+    | None -> failure ()
+    | Some fd -> success {st with State.fd = fd }
+
+  let neq a b st =
+    match FM.neq a b (State.fds st) with
+    | None -> failure ()
+    | Some fd -> success {st with State.fd = fd }
+
+  let domain v xs st =
+    match FM.domain v xs (State.fds st) with
+    | None -> failure ()
+    | Some fd -> success {st with State.fd = fd }
+
+end
 
 let (===) x y st =
   let _t =
@@ -664,6 +690,10 @@ module Table :
 
     type t = Cache.t H.t
 
+    (* To support diseq. constraints we need to put into answer some constraints
+       for mentioned variables. Every variable should receive 0 or 1 constraint
+       because we aim for simplified case.
+    *)
     let make_answ args st =
       match State.reify args st with
       | [answ] ->
