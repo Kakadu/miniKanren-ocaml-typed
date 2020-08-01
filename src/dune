@@ -3,7 +3,7 @@
 (library
  (name OCanren)
  (public_name OCanren)
- (libraries GT mtime.clock.os)
+ (libraries GT mtime.clock.os aez)
  (flags
   (:standard -short-paths))
  (preprocess

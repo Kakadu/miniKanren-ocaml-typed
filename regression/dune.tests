@@ -19,6 +19,8 @@
     test019tablingCache
     test020
     test021structural
+    test030fd
+    test031mc
   )
   (libraries GT OCanren OCanren.tester)
   (preprocess (action

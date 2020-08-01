@@ -1,6 +1,6 @@
 (executables
-  (names tree sorting WGC)
-  (libraries GT OCanren)
+  (names tree sorting WGC fd)
+  (libraries GT OCanren benchmark OCanren.tester)
   (preprocess (action
     (run %{project_root}/camlp5/pp5+gt+plugins+ocanren+logger+o.byte  %{input-file})
   ))
@@ -9,5 +9,5 @@
 
 (alias
   (name samples)
-  (deps tree.exe sorting.exe WGC.exe lorry.exe)
+  (deps tree.exe sorting.exe WGC.exe lorry.exe fd.exe)
 )
