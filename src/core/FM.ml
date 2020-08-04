@@ -22,7 +22,7 @@ let (!!!) = Obj.magic;;
 
 type inti = (int, int logic) injected
 type ph_desc = item list
-type t = (VarSet.t * ph_desc)
+type t = (VarSet.t * ph_desc) list
 
 let var_of_idx idx = Aez.Hstring.make (sprintf "x%d" idx)
 let decl_var idx =
@@ -137,13 +137,17 @@ let add_binop op (a: inti) (b:inti) (set,is) : t option =
     (set, ta, tb)
   in
   let is = (op ta tb)::is in
+  (set, is)
+
+let check (_,is) =
   if check_item_list is
   then Some (set, is)
   else None
 
-let neq  = add_binop (fun a b -> FMEQ  (a,b))
-let eq   = add_binop (fun a b -> FMNEQ (a,b))
-let lt   = add_binop (fun a b -> FMLT  (a,b))
+let neq x y t = check @@ add_binop (fun a b -> FMEQ  (a,b)) x y t
+let eq  x y t = check @@ add_binop (fun a b -> FMNEQ (a,b)) x y t
+let lt  x y t = check @@ add_binop (fun a b -> FMLT  (a,b)) x y t
+let (=/=) = neq
 
 let domain v ints (set,is) =
   let (set,v) =
@@ -158,16 +162,57 @@ let domain v ints (set,is) =
   else None
 
 
-let (=/=) = neq
 
+let rec fold_cps ~f ~init xs =
+  match xs with
+  | [] -> init
+  | x::xs -> f init x xs (fun acc -> fold_cps ~f ~init:acc xs)
 
-let empty () = (VarSet.empty,[])
+let empty () = []
+
+exception Bad
+type lookup_rez =
+  | One of VarSet.t * ph_desc
+  | Zero
 
 let recheck _env _subst t _prefix =
   let open Subst in
   (* We should iter prefix and see if some new substitution affect our constraints.
      In some cases our constraints can be merged
   *)
+
+  let on_var_and_term v term store =
+    try
+      let ans =
+        fold_cps ~init:[] store (fun acc (set,is) tl k ->
+          if VarSet.mem v set
+          then
+            let st = add_binop (fun a b -> FMEQ (a,b)) !!!v !!!term in
+            match check st with
+            | None -> raise Bad
+            | Some -> acc @ (set,st) :: tl
+        )
+      in
+      (* If something bad happends on the way -- exception *)
+      Some ans
+    with Bad -> None
+  in
+
+  let on_two_vars v1 v2 store =
+    let ans =
+      fold_cps ~init:(Zero,[]) store (fun acc (set,is) tl k ->
+        if VarSet.mem v set
+        then
+      )
+    in
+    match ans with
+    | (Zero,_) ->
+        let s = VarSet.(add v1 (add v2 empty)) in
+        add_binop (fun a b -> FMEQ (a,b)) !!!v1 !!!v2 (empty ())
+    | One (set,is),tl ->
+
+  in
+
   Stdlib.List.fold_left (fun acc bin ->
     (* TODO: optimize with early exit *)
     match acc with
