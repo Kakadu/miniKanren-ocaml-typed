@@ -33,6 +33,8 @@ type goal = State.t RStream.t goal'
     parameter *)
 val call_fresh : (('a, 'b) injected -> goal) -> goal
 
+val wc : (('a, 'b) injected -> goal) -> goal
+
 (** [x === y] creates a goal, which performs a unification of [x] and [y] *)
 val (===) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
 
@@ -363,8 +365,8 @@ module Tabling :
 val id : 'a -> 'a
 
 (** Unification counter *)
-val unification_counter : unit -> int                 
+val unification_counter : unit -> int
 val unification_time    : unit -> Mtime.span
 val conj_counter        : unit -> int
 val disj_counter        : unit -> int
-val delay_counter       : unit -> int                                    
+val delay_counter       : unit -> int

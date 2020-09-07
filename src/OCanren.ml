@@ -23,7 +23,7 @@ module Stream  = RStream
 module Peep    = Peep
 module Runconf = Runconf
 module Timer   = Timer
-               
+
 module Std =
   struct
 
@@ -67,4 +67,5 @@ module Std =
 
     let structural = Core.structural
 
+    let wc = Core.wc
   end
