@@ -44,6 +44,7 @@ let check_item_list is =
   (* Construct request to solver there and check that it is satisfiable.
   *)
   try
+    Format.printf "checking_item_list:\n%a\n%!" (GT.fmt GT.list @@ fmt_phormula) is;
     Solver.clear ();
     let wrap_binop op a b = F.make_lit op [ wrap_term a; wrap_term b ] in
     let make op xs =
@@ -141,6 +142,7 @@ let add_binop op (a: inti) (b:inti) (set,is) : item =
   (set, is)
 
 let check store =
+  Format.printf "Check called\n%!";
   if check_item_list @@ snd store
   then Some store
   else None
@@ -158,32 +160,42 @@ type lookup_rez =
   | One of (VarSet.t * ph_desc)
   | Zero
 
+exception Extended of t
+
 let recheck_helper1 op (store: t) a b =
-  let open Subst in
+
   (* We should iter prefix and see if some new substitution affect our constraints.
      In some cases our constraints can be merged
   *)
 
-  let on_var_and_term v term store =
+
+  let on_var_and_term v term (store: t) : t option =
+    Format.printf "%s %d\n%!" __FILE__ __LINE__;
     try
-      let ans =
+      let _ =
         fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
           if VarSet.mem v set
           then
             let st = add_binop op !!!v !!!term (set, is) in
             match check st with
             | None -> raise Bad
-            | Some item -> acc @ item :: tl
+            | Some item -> raise (Extended (acc @ item :: tl))
           else
             k ( (set,is) :: acc)
         )
       in
       (* If something bad happends on the way -- exception *)
-      Some ans
+      (* Got here if variable is new *)
+      let new_ =
+        (add_binop op !!!v !!!term (VarSet.empty, []))
+      in
+      Some (new_ :: store)
     with Bad -> None
+       | Extended t -> Some t
   in
 
   let on_two_vars v1 v2 store =
+    Format.printf "%s %d\n%!" __FILE__ __LINE__;
     let ext_set set = VarSet.(add v1 (add v2 set)) in
     let ans =
       fold_cps ~init:(Zero,[]) store ~f:(fun acc ((set,is) as a) tl k ->
@@ -282,6 +294,3 @@ let domain (v: inti) ints store =
         k ((set,is)::acc)
     ) |> (fun x -> Some x)
   with Bad -> None
-
-
-
