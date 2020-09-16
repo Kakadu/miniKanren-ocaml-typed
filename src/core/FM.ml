@@ -25,6 +25,21 @@ type ph_desc = phormula list
 type item = VarSet.t * ph_desc
 type t = item list
 
+let pp_ph_desc fmt =
+  let pp_term fmt = function
+    | Var n -> Format.fprintf fmt "_.%d" n
+    | Const n -> Format.fprintf fmt "%d" n
+  in
+  let pp fmt = function
+    | FMNEQ (l, r) -> Format.fprintf fmt "%a≠%a" pp_term l pp_term r
+    | FMEQ  (l, r) -> Format.fprintf fmt "%a=%a" pp_term l pp_term r
+    | FMLE  (l, r) -> Format.fprintf fmt "%a⩽%a" pp_term l pp_term r
+    | FMLT  (l, r) -> Format.fprintf fmt "%a<%a" pp_term l pp_term r
+    | FMDom (n,xs) -> Format.fprintf fmt "_.%d ∈ %a" n (GT.fmt GT.list @@ GT.fmt GT.int) xs
+  in
+  GT.fmt GT.list pp fmt
+
+
 let var_of_idx idx = Aez.Hstring.make (sprintf "x%d" idx)
 let decl_var idx =
   let x = var_of_idx idx in
@@ -44,7 +59,7 @@ let check_item_list is =
   (* Construct request to solver there and check that it is satisfiable.
   *)
   try
-    Format.printf "checking_item_list:\n%a\n%!" (GT.fmt GT.list @@ fmt_phormula) is;
+    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;
     Solver.clear ();
     let wrap_binop op a b = F.make_lit op [ wrap_term a; wrap_term b ] in
     let make op xs =
@@ -142,7 +157,7 @@ let add_binop op (a: inti) (b:inti) (set,is) : item =
   (set, is)
 
 let check store =
-  Format.printf "Check called\n%!";
+  (* Format.printf "Check called\n%!"; *)
   if check_item_list @@ snd store
   then Some store
   else None
@@ -170,7 +185,7 @@ let recheck_helper1 op (store: t) a b =
 
 
   let on_var_and_term v term (store: t) : t option =
-    Format.printf "%s %d\n%!" __FILE__ __LINE__;
+    (* Format.printf "on_var_and_term: term=%d %s %d\n%!" !!!term __FILE__ __LINE__; *)
     try
       let _ =
         fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
@@ -195,7 +210,7 @@ let recheck_helper1 op (store: t) a b =
   in
 
   let on_two_vars v1 v2 store =
-    Format.printf "%s %d\n%!" __FILE__ __LINE__;
+    (* Format.printf "%s %d\n%!" __FILE__ __LINE__; *)
     let ext_set set = VarSet.(add v1 (add v2 set)) in
     let ans =
       fold_cps ~init:(Zero,[]) store ~f:(fun acc ((set,is) as a) tl k ->
@@ -227,12 +242,14 @@ let recheck_helper1 op (store: t) a b =
       | None -> None
   in
 
+  (* Format.printf "HACK: b = %d, %s %d\n%!" !!!b __FILE__ __LINE__; *)
+
   match Term.(var a, var b) with
   | None,None when !!!a = !!!b -> Some store
   | None,None                  -> None
   | Some v1, Some v2 -> on_two_vars v1 v2 store
-  | Some v, x
-  | x, Some v -> on_var_and_term v x store
+  | Some v, None -> on_var_and_term v !!!b store
+  | None, Some v -> on_var_and_term v !!!a store
 
 let recheck_helper op (store: t) (_prefix : Subst.Binding.t list) =
   try
@@ -282,15 +299,21 @@ let domain (v: inti) ints store =
   in
 
   try
-    fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
-      if VarSet.mem v set
-      then begin
-        let d = FMDom (v.Term.Var.index, ints) in
-        let is = d::is in
-        if check_item_list is
-        then (VarSet.add v set, is) :: (acc @ tl)
-        else raise Bad
-      end else
-        k ((set,is)::acc)
-    ) |> (fun x -> Some x)
-  with Bad -> None
+    let _ =
+      fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
+        if VarSet.mem v set
+        then begin
+          let d = FMDom (v.Term.Var.index, ints) in
+          let is = d::is in
+          if check_item_list is
+          then raise (Extended ((VarSet.add v set, is) :: (acc @ tl)))
+          else raise Bad
+        end else
+          k ((set,is)::acc)
+      )
+    in
+    let new_ = (VarSet.add !!!v VarSet.empty, [FMDom (v.Term.Var.index, ints)]) in
+    Some (new_ :: store)
+  with
+    | Bad -> None
+    | Extended t -> Some t

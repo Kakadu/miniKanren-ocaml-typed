@@ -1,5 +1,10 @@
 open OCanren
 open Tester
+
+let () =
+  Format.set_max_indent 0;
+  Format.set_margin 100
+
 (*
 let rel1 x =
   fresh (temp)
@@ -21,8 +26,8 @@ let rel3 dom a b c d =
     (FD.lt c d)
 
 let _freeVars =
-  runL   1  q     qh (REPR (fun x -> (FD.domain x [1;2]) &&&  (FD.neq x !!1) &&& (FD.neq x !!2) ));
+  runL   1  q     qh (REPR (fun x -> (FD.domain x [1;2]) &&&  (FD.neq x !!2) &&& (FD.neq x !!1) ));
   runL   1  q     qh (REPR (fun x -> (FD.domain x [1;2]) &&&  (FD.neq x !!1) ));
-  (* runL   1  qrst  qrsth (REPR (rel3 [1;2;3]));
-  runL   1  qrst  qrsth (REPR (rel3 [1;2;3;4])); *)
+  runL   1  qrst  qrsth (REPR (rel3 [1;2;3]));
+  runL   1  qrst  qrsth (REPR (rel3 [1;2;3;4]));
   ()
