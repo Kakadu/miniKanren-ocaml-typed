@@ -58,8 +58,16 @@ let wrap_term = function
 let check_item_list is =
   (* Construct request to solver there and check that it is satisfiable.
   *)
+  let _ =
+    match is with
+    | [] -> ()
+    | _ ->
+      Format.printf "\t%a\n%!" pp_ph_desc is;
+
+      failwith "It should be empty"
+  in
   try
-    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;
+(*    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;*)
     Solver.clear ();
     let wrap_binop op a b = F.make_lit op [ wrap_term a; wrap_term b ] in
     let make op xs =
@@ -177,15 +185,15 @@ type lookup_rez =
 
 exception Extended of t
 
-let recheck_helper1 op (store: t) a b =
-
+let recheck_helper1 ~do_add op (store: t) a b =
+(*  Format.printf "recheck_helper1 %s %d\n%!" __FILE__ __LINE__;*)
   (* We should iter prefix and see if some new substitution affect our constraints.
      In some cases our constraints can be merged
   *)
 
 
   let on_var_and_term v term (store: t) : t option =
-    (* Format.printf "on_var_and_term: term=%d %s %d\n%!" !!!term __FILE__ __LINE__; *)
+(*    Format.printf "on_var_and_term: term=%d %s %d\n%!" !!!term __FILE__ __LINE__;*)
     try
       let _ =
         fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
@@ -201,10 +209,11 @@ let recheck_helper1 op (store: t) a b =
       in
       (* If something bad happends on the way -- exception *)
       (* Got here if variable is new *)
-      let new_ =
-        (add_binop op !!!v !!!term (VarSet.empty, []))
-      in
-      Some (new_ :: store)
+      if do_add
+      then
+        let new_ = add_binop op !!!v !!!term (VarSet.empty, []) in
+        Some (new_ :: store)
+      else Some store
     with Bad -> None
        | Extended t -> Some t
   in
@@ -242,26 +251,31 @@ let recheck_helper1 op (store: t) a b =
       | None -> None
   in
 
-  (* Format.printf "HACK: b = %d, %s %d\n%!" !!!b __FILE__ __LINE__; *)
+(*  Format.printf "HACK: a= '%s', b = '%s'. %s %d\n%!" (Term.show !!!a) (Term.show !!!b) __FILE__ __LINE__;*)
 
   match Term.(var a, var b) with
-  | None,None when !!!a = !!!b -> Some store
-  | None,None                  -> None
-  | Some v1, Some v2 -> on_two_vars v1 v2 store
-  | Some v, None -> on_var_and_term v !!!b store
-  | None, Some v -> on_var_and_term v !!!a store
+  | None,None when !!!a = !!!b ->
+(*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
+      Some store
+  | None,None                  ->
+(*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
+      None
+  | Some v1, Some v2 ->
+(*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
+      on_two_vars v1 v2 store
+  | Some v, None ->
+(*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
+      on_var_and_term v !!!b store
+  | None, Some v ->
+(*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
+      on_var_and_term v !!!a store
 
 let recheck_helper op (store: t) (_prefix : Subst.Binding.t list) =
+(*  if store <> [] then Format.printf "store is not empty\n%!";*)
   try
     Some (fold_cps ~init:store _prefix ~f:(fun acc bin _tl k ->
-(*
-      let acc =
-        match Term.var bin.Binding.term with
-        | Some v2 -> on_two_vars bin.Binding.var v2 acc
-        | None -> on_var_and_term bin.Binding.var !!!(bin.Binding.term) acc
-      in*)
       let open Subst in
-      match recheck_helper1 op !!!(bin.Binding.var) !!!(bin.Binding.term) acc with
+      match recheck_helper1 op acc !!!(bin.Binding.var) !!!(bin.Binding.term) with
       | None -> raise Bad
       | Some ans -> k ans
     ))

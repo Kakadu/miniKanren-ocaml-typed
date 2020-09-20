@@ -288,6 +288,11 @@ module State =
       let (>>=?) x f  = match x with Some a -> f a | None -> None in
 
       Subst.unify ~scope env subst x y          >>=? fun (prefix, subst) ->
+(*      let () = Format.printf "After unification prefix = %a\n%!"
+        (GT.fmt GT.list @@ fun fmt b ->
+          Format.fprintf fmt "(%s,%s)" (Term.show @@ Obj.repr b.Subst.Binding.var) (Term.show @@ Obj.repr b.Subst.Binding.term))
+        prefix
+      in*)
       Disequality.recheck env subst ctrs prefix >>=? fun ctrs ->
       FM.recheck env subst fd prefix            >>=? fun fd ->
         let next_state = { st with subst; ctrs; fd } in
