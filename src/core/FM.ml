@@ -60,7 +60,7 @@ let check_item_list is =
   *)
 
   try
-    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;
+(*    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;*)
     Solver.clear ();
     let wrap_binop op a b = F.make_lit op [ wrap_term a; wrap_term b ] in
     let make op xs =
@@ -92,7 +92,9 @@ let check_item_list is =
     if is <> [] then Solver.check ();
     true
   with
-    | Aez.Smt.Unsat _core -> false
+    | Aez.Smt.Unsat _core ->
+        Format.printf "UNSAT\n%!";
+        false
     | Aez.Smt.Error e ->
         let open Aez in
         match e with

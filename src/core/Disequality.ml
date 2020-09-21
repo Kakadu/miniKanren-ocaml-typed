@@ -114,9 +114,19 @@ module Disjunct :
     val simplify : Env.t -> Subst.t -> t -> t option
 
     val reify : Env.t -> Subst.t -> t -> Subst.Binding.t list
+
+    val pp : Format.formatter -> t -> unit
   end =
   struct
     type t = Term.t Term.VarMap.t
+
+
+    let pp fmt m =
+      match Term.VarMap.cardinal m with
+      | 0 -> Format.fprintf fmt "<empty>"
+      | 1 -> Format.fprintf fmt "%s" (Term.show @@ snd @@ Obj.magic (Term.VarMap.min_binding m))
+      | _ -> failwith "should not happen"
+
 
     let update t =
       ListLabels.fold_left ~init:t
@@ -229,6 +239,8 @@ module Conjunct :
     val diff : Env.t -> Subst.t -> t -> t -> t * t
 
     val reify : Env.t -> Subst.t -> t -> 'a -> Answer.t list
+
+    val pp: Format.formatter -> t -> unit
   end = struct
     let next_id = ref 0
 
@@ -244,6 +256,15 @@ module Conjunct :
       let id = !next_id in
       next_id := !next_id + 1;
       M.singleton id @@ Disjunct.make env subst x y
+
+    let pp fmt m =
+      match M.cardinal m with
+      | 0 -> Format.fprintf fmt "<empty>"
+      | _ ->
+        M.iter (fun k v ->
+          Format.fprintf fmt "%d -> %a;" k Disjunct.pp  v
+        ) m
+
 
     let split t =
       M.fold (fun id disj acc ->
@@ -351,6 +372,14 @@ type t = Conjunct.t Term.VarMap.t
 
 let empty = Term.VarMap.empty
 
+let pp fmt t =
+  match Sys.getenv_opt "OCANREN_TRACE_DISEQ" with
+  | None -> ()
+  | Some _ ->
+      Term.VarMap.iter (fun k v ->
+        Conjunct.pp fmt v
+      )t
+
 (* merges all conjuncts (linked to different variables) into one *)
 let combine env subst cstore =
   Term.VarMap.fold (fun _ -> Conjunct.merge_disjoint env subst) cstore Conjunct.empty
@@ -364,12 +393,18 @@ let update env subst conj = merge_disjoint env subst (Conjunct.split conj)
 
 let add env subst cstore x y =
   try
+    if (Sys.getenv_opt "OCANREN_TRACE_DISEQ" <> None) then
+    Format.printf "add '%s' and '%s' to %a " (Term.show @@ Obj.magic x) (Term.show @@ Obj.repr y) pp cstore;
     Some (update env subst (Conjunct.make env subst x y) cstore)
   with
     | Disequality_fulfilled -> Some cstore
-    | Disequality_violated  -> None
+    | Disequality_violated  ->
+      None
+
 
 let recheck env subst cstore bs =
+  if not (Term.VarMap.is_empty cstore) && (Sys.getenv_opt "OCANREN_TRACE_DISEQ" <> None)
+  then Format.printf "recheck: %a\n" pp cstore;
   let helper var cstore =
     try
       let conj = Term.VarMap.find var cstore in
@@ -394,3 +429,4 @@ let project env subst cstore fv =
 
 let reify env subst cstore x =
   Conjunct.reify env subst (combine env subst cstore) x
+
