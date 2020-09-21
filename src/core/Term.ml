@@ -78,7 +78,11 @@ module Var =
 
   end
 
-module VarSet = Set.Make(Var)
+module VarSet = struct
+  include Set.Make(Var)
+
+  let merge = fold add
+end
 module VarTbl = Hashtbl.Make(Var)
 
 module VarMap =

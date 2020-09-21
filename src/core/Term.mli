@@ -57,7 +57,10 @@ module Var :
     val hash : t -> int
   end
 
-module VarSet : Set.S with type elt = Var.t
+module VarSet : sig
+  include (Set.S with type elt = Var.t)
+  val merge: t -> t -> t
+end
 
 module VarTbl : Hashtbl.S with type key = Var.t
 

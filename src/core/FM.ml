@@ -58,16 +58,9 @@ let wrap_term = function
 let check_item_list is =
   (* Construct request to solver there and check that it is satisfiable.
   *)
-  let _ =
-    match is with
-    | [] -> ()
-    | _ ->
-      Format.printf "\t%a\n%!" pp_ph_desc is;
 
-      failwith "It should be empty"
-  in
   try
-(*    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;*)
+    Format.printf "checking_item_list: %a\n%!" pp_ph_desc is;
     Solver.clear ();
     let wrap_binop op a b = F.make_lit op [ wrap_term a; wrap_term b ] in
     let make op xs =
@@ -180,42 +173,47 @@ let empty () = []
 
 exception Bad
 type lookup_rez =
-  | One of (VarSet.t * ph_desc)
   | Zero
+  | One of (VarSet.t * ph_desc)
+  | Two of (VarSet.t * ph_desc) * (VarSet.t * ph_desc)
 
 exception Extended of t
 
 let recheck_helper1 ~do_add op (store: t) a b =
 (*  Format.printf "recheck_helper1 %s %d\n%!" __FILE__ __LINE__;*)
-  (* We should iter prefix and see if some new substitution affect our constraints.
-     In some cases our constraints can be merged
-  *)
-
 
   let on_var_and_term v term (store: t) : t option =
 (*    Format.printf "on_var_and_term: term=%d %s %d\n%!" !!!term __FILE__ __LINE__;*)
-    try
-      let _ =
-        fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
-          if VarSet.mem v set
-          then
-            let st = add_binop op !!!v !!!term (set, is) in
-            match check st with
-            | None -> raise Bad
-            | Some item -> raise (Extended (acc @ item :: tl))
-          else
-            k ( (set,is) :: acc)
-        )
-      in
-      (* If something bad happends on the way -- exception *)
-      (* Got here if variable is new *)
-      if do_add
-      then
-        let new_ = add_binop op !!!v !!!term (VarSet.empty, []) in
-        Some (new_ :: store)
-      else Some store
-    with Bad -> None
-       | Extended t -> Some t
+    let ans =
+      fold_cps ~init:(Zero,[]) store ~f:(fun acc ((set,is) as a) tl k ->
+        if VarSet.mem v set
+        then
+          match acc with
+          | Zero,visited -> k (One a, visited @ tl)
+          | One (_,_),_ -> failwith "Should not happen"
+          | Two (_,_),_ -> failwith "Should not happen"
+          (* let st = add_binop op !!!v !!!term (set, is) in
+          match check st with
+          | None -> raise Bad
+          | Some item -> raise (Extended (acc @ item :: tl)) *)
+        else
+          let v,xs = acc in
+          k (v,a::xs)
+      )
+    in
+    let ext_and_check (set,phs,tl) =
+    (* we need to prepend to tail new pack of constraints *)
+      let set = VarSet.add v set in
+      let h = add_binop op !!!v !!!term (set,phs) in
+      match check h with
+        | Some h -> Some (h::tl)
+        | None -> None
+    in
+    match ans with
+    | Zero,tl when do_add -> ext_and_check (VarSet.empty, [], tl)
+    | Zero,_ -> Some store
+    | One (s,is),tl -> ext_and_check (s,is,tl)
+    | Two ((s1,ph1), (s2,ph2)),tl -> failwith "Should not happen"
   in
 
   let on_two_vars v1 v2 store =
@@ -231,24 +229,31 @@ let recheck_helper1 ~do_add op (store: t) a b =
                 let s3 = VarSet.(add v1 (add v2 (union s2 set))) in
                 let is3 = Stdlib.List.append is is2 in
                 (One (s3,is3), Stdlib.List.append tl2 tl)
+            | Two (_,_),_ -> failwith "should not happen"
         end else
           let v,xs = acc in
           k (v,a::xs)
       )
     in
 
-    let (set,is,tl) =
+    let ext_and_check (set,phs,tl) =
+    (* we need to prepend to tail new pack of constraints *)
+      let set = ext_set set in
+      let h = add_binop op !!!v1 !!!v2 (set,phs) in
+      match check h with
+        | Some h -> Some (h::tl)
+        | None -> None
+    in
+    (* let (set,is,tl) =
       match ans with
       | Zero, tl -> (VarSet.empty, [], tl)
       | One (s,is),tl -> (s,is,tl)
-    in
-
-    (* we need to prepend to tail new pack of constraints *)
-    let set = ext_set set in
-    let h = add_binop op !!!v1 !!!v2 (set,is) in
-    match check h with
-      | Some h -> Some (h::tl)
-      | None -> None
+    in *)
+    match ans with
+    | Zero,tl when do_add -> ext_and_check (VarSet.empty, [], tl)
+    | Zero,_ -> Some store
+    | One (s,is),tl -> ext_and_check (s,is,tl)
+    | Two ((s1,ph1), (s2,ph2)),tl -> ext_and_check (VarSet.merge s1 s2, ph1@ph2, tl)
   in
 
 (*  Format.printf "HACK: a= '%s', b = '%s'. %s %d\n%!" (Term.show !!!a) (Term.show !!!b) __FILE__ __LINE__;*)
@@ -270,19 +275,19 @@ let recheck_helper1 ~do_add op (store: t) a b =
 (*      Format.printf "%s %d\n%!"  __FILE__ __LINE__;*)
       on_var_and_term v !!!a store
 
-let recheck_helper op (store: t) (_prefix : Subst.Binding.t list) =
+let recheck_helper ~do_add op (store: t) (_prefix : Subst.Binding.t list) =
 (*  if store <> [] then Format.printf "store is not empty\n%!";*)
   try
     Some (fold_cps ~init:store _prefix ~f:(fun acc bin _tl k ->
       let open Subst in
-      match recheck_helper1 op acc !!!(bin.Binding.var) !!!(bin.Binding.term) with
+      match recheck_helper1 ~do_add op acc !!!(bin.Binding.var) !!!(bin.Binding.term) with
       | None -> raise Bad
       | Some ans -> k ans
     ))
   with Bad -> None
 
 let recheck _env _subst (store: t) (_prefix : Subst.Binding.t list) =
-  recheck_helper (fun a b -> FMEQ (a,b)) store _prefix
+  recheck_helper (fun a b -> FMEQ (a,b)) ~do_add:false store _prefix
 
 let check store : t option =
   try
@@ -295,13 +300,13 @@ let check store : t option =
 
 
 let neq x y store =
-  recheck_helper1 (fun a b -> FMNEQ (a,b)) store x y
+  recheck_helper1 (fun a b -> FMNEQ (a,b)) ~do_add:true store x y
 
 let eq  x y store : t option =
-  recheck_helper1 (fun a b -> FMEQ (a,b)) store x y
+  recheck_helper1 (fun a b -> FMEQ (a,b)) ~do_add:true store x y
 
 let lt  x y store =
-  recheck_helper1 (fun a b -> FMLT (a,b)) store x y
+  recheck_helper1 (fun a b -> FMLT (a,b)) ~do_add:true store x y
 
 let (=/=) = neq
 
@@ -311,7 +316,7 @@ let domain (v: inti) ints store =
     | None -> failwith "should not happen"
     | Some v  -> v
   in
-
+(*  *)
   try
     let _ =
       fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
