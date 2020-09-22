@@ -401,10 +401,12 @@ let add env subst cstore x y =
     | Disequality_violated  ->
       None
 
+let trace_diseq () = Sys.getenv_opt "OCANREN_TRACE_DISEQ" <> None
+
 
 let recheck env subst cstore bs =
-  if not (Term.VarMap.is_empty cstore) && (Sys.getenv_opt "OCANREN_TRACE_DISEQ" <> None)
-  then Format.printf "recheck: %a\n" pp cstore;
+  if not (Term.VarMap.is_empty cstore) && (trace_diseq ())
+  then Format.printf "Disequality.recheck: %a\n" pp cstore;
   let helper var cstore =
     try
       let conj = Term.VarMap.find var cstore in
@@ -422,11 +424,16 @@ let recheck env subst cstore bs =
       )
     in
     Some cstore
-  with Disequality_violated -> None
+  with Disequality_violated ->
+    if trace_diseq ()
+    then
+      Format.printf "Disequality VIOLATED for store = '%a' and prefix='%a'\n%!"
+        pp cstore
+        (GT.fmt GT.list @@ Subst.Binding.pp)  bs;
+    None
 
 let project env subst cstore fv =
   Conjunct.(split @@ project env subst (combine env subst cstore) fv)
 
 let reify env subst cstore x =
   Conjunct.reify env subst (combine env subst cstore) x
-

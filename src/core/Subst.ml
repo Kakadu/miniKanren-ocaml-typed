@@ -44,6 +44,9 @@ module Binding =
       if res <> 0 then res else Term.compare t p
 
     let hash {var; term} = Hashtbl.hash (Term.Var.hash var, Term.hash term)
+
+    let pp fmt { var; term} =
+      Format.fprintf fmt "%s -> %s" (Term.show @@ Obj.repr var) (Term.show @@ Obj.repr term)
   end
 
 type t = Term.t Term.VarMap.t

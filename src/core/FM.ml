@@ -2,14 +2,17 @@ open Logic
 open Term
 open Format
 
+type inti = (int, int logic) injected
+let (!!!) = Obj.magic;;
+
+
 module T = Aez.Smt.Term
 module F = Aez.Smt.Formula
 module Solver = Aez.Smt.Make (struct end)
 module Symbol = Aez.Smt.Symbol
-module Type = Aez.Smt.Type
+module Type = Aez.Smt.Type;;
 
-let (!!!) = Obj.magic;;
-
+module Encoding = struct
 @type var_idx = GT.int with fmt
 @type term = Var of var_idx | Const of GT.int with fmt
 @type phormula =
@@ -20,7 +23,7 @@ let (!!!) = Obj.magic;;
   | FMNEQ of term * term
   with fmt
 
-type inti = (int, int logic) injected
+
 type ph_desc = phormula list
 type item = VarSet.t * ph_desc
 type t = item list
@@ -104,60 +107,21 @@ let check_item_list is =
             failwith (Printf.sprintf "DuplicateSymb %s\n%!" (Aez.Hstring.view s))
         | DuplicateTypeName s -> failwith (Printf.sprintf "DuplicateTypeName %s\n%!" (Hstring.view s))
         | UnknownType s -> failwith (Printf.sprintf "unknown type '%s'. \n%!" (Hstring.view s))
-(*
-type lookup_rez =
-  | Two of (VarSet.t * ph_desc) * (VarSet.t * ph_desc)
-  | One of (VarSet.t * ph_desc)
-  | Zero
 
-let rec fold_cps ~f ~init xs =
-  match xs with
-  | [] -> init
-  | x::xs -> f init x (fun acc -> fold_cps ~f ~init:acc xs)
-*)
-(*
-let lookup a b (set,is) =
-
-  let extend v = function
-  | Zero -> One v
-  | One v1 -> Two (v1, v)
-  | Two (_,_) -> failwith "should not happpen"
-  in
-  let flt v1 v2 xs =
-    fold_cps ~init:Zero ~f:(fun acc x k ->
-      match x with
-      | (set, items) when Term.VarSet.mem v1 set ->
-    )
-  in
-    List.fold_left (fun acc x ->
-      match (acc,x) with
-      | T
-    ) Zero xs
-  in
-
-  let f x =
-    match Term.is_var x with
-    | None ->
-  | Some v1, Some v2 -> begin
-      let verdict =
-
+  let add_binop op (a: inti) (b:inti) (set,is) : item =
+    let set, ta, tb =
+      let f set x = match Term.var x with
+        | None   -> (set, Const (Obj.magic x))
+        | Some v -> (VarSet.add v set, Var v.Term.Var.index)
       in
-  end
-*)
-
-
-let add_binop op (a: inti) (b:inti) (set,is) : item =
-  let set, ta, tb =
-    let f set x = match Term.var x with
-      | None   -> (set, Const (Obj.magic x))
-      | Some v -> (VarSet.add v set, Var v.Term.Var.index)
+      let set,ta = f set !!!a in
+      let set,tb = f set !!!b in
+      (set, ta, tb)
     in
-    let set,ta = f set !!!a in
-    let set,tb = f set !!!b in
-    (set, ta, tb)
-  in
-  let is = (op ta tb) :: is in
-  (set, is)
+    let is = (op ta tb) :: is in
+    (set, is)
+
+end
 
 let check store =
   (* Format.printf "Check called\n%!"; *)
@@ -213,7 +177,9 @@ let recheck_helper1 ~do_add op (store: t) a b =
     in
     match ans with
     | Zero,tl when do_add -> ext_and_check (VarSet.empty, [], tl)
-    | Zero,_ -> Some store
+    | Zero,_ ->
+        Format.printf "Not adding new constrain %s %d\n%!" __FILE__ __LINE__;
+        Some store
     | One (s,is),tl -> ext_and_check (s,is,tl)
     | Two ((s1,ph1), (s2,ph2)),tl -> failwith "Should not happen"
   in
@@ -246,14 +212,11 @@ let recheck_helper1 ~do_add op (store: t) a b =
         | Some h -> Some (h::tl)
         | None -> None
     in
-    (* let (set,is,tl) =
-      match ans with
-      | Zero, tl -> (VarSet.empty, [], tl)
-      | One (s,is),tl -> (s,is,tl)
-    in *)
     match ans with
     | Zero,tl when do_add -> ext_and_check (VarSet.empty, [], tl)
-    | Zero,_ -> Some store
+    | Zero,_ ->
+        Format.printf "Not adding new constrain %s %d\n%!" __FILE__ __LINE__;
+        Some store
     | One (s,is),tl -> ext_and_check (s,is,tl)
     | Two ((s1,ph1), (s2,ph2)),tl -> ext_and_check (VarSet.merge s1 s2, ph1@ph2, tl)
   in
@@ -278,7 +241,6 @@ let recheck_helper1 ~do_add op (store: t) a b =
       on_var_and_term v !!!a store
 
 let recheck_helper ~do_add op (store: t) (_prefix : Subst.Binding.t list) =
-(*  if store <> [] then Format.printf "store is not empty\n%!";*)
   try
     Some (fold_cps ~init:store _prefix ~f:(fun acc bin _tl k ->
       let open Subst in
@@ -318,7 +280,7 @@ let domain (v: inti) ints store =
     | None -> failwith "should not happen"
     | Some v  -> v
   in
-(*  *)
+
   try
     let _ =
       fold_cps ~init:[] store ~f:(fun acc (set,is) tl k ->
