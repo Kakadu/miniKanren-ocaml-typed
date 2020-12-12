@@ -24,7 +24,7 @@ module State :
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal'
+type 'a goal'  = State.t -> 'a
 type goal = State.t Stream.t goal'
 
 (** {3 miniKanren basic combinators} *)

@@ -282,6 +282,7 @@ module State =
     let new_scope st = {st with scope = Term.Var.new_scope ()}
 
     let unify x y ({env; subst; ctrs; scope} as st) =
+      (* Format.printf "Cardinality = %d (%s %d)\n%!" (Subst.cardinality subst) __FILE__ __LINE__; *)
         match Subst.unify ~scope env subst x y with
         | None -> None
         | Some (prefix, subst) ->
@@ -366,10 +367,10 @@ let (===) x y st =
 
   match State.unify x y st with
   | Some st ->
-    let () = IFDEF STATS THEN unification_time_incr t ELSE () END in
+    let () = IFDEF STATS THEN unification_time_incr _t ELSE () END in
     success st
   | None    ->
-    let () = IFDEF STATS THEN unification_time_incr t ELSE () END in
+    let () = IFDEF STATS THEN unification_time_incr _t ELSE () END in
     failure st
 
 let unify = (===)

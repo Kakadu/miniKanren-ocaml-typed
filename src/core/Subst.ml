@@ -49,6 +49,7 @@ module Binding =
 type t = Term.t Term.VarMap.t
 
 let empty = Term.VarMap.empty
+let cardinality = Term.VarMap.cardinal
 
 let of_list =
   ListLabels.fold_left ~init:empty ~f:(let open Binding in fun subst {var; term} ->
@@ -133,12 +134,12 @@ let extend ~scope env subst var term  =
    * 2) If we do unification after a fresh, then in case of failure it doesn't matter if
    *    the variable is be distructively substituted: we will not look on it in future.
    *)
-  if (scope = var.Term.Var.scope) && (scope <> Term.Var.non_local_scope)
+  (* if (scope = var.Term.Var.scope) && (scope <> Term.Var.non_local_scope)
   then begin
     var.subst <- Some (Obj.repr term);
     subst
   end
-    else
+    else *)
       Term.VarMap.add var (Term.repr term) subst
 
 exception Unification_failed

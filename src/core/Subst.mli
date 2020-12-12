@@ -85,3 +85,6 @@ val reify : Env.t -> t -> 'a -> Answer.t
 
 (** Walk counter *)
 val walk_counter : unit -> int
+
+
+val cardinality : t -> int
