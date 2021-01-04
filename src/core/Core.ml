@@ -728,3 +728,7 @@ module Tabling =
       g := currier g_tabled;
       !g
   end
+
+
+let apply_fcpm : _ -> (Env.t -> _ -> goal) -> goal = fun q f st ->
+  f (State.env st) (Subst.apply (State.env st) (State.subst st) q) st

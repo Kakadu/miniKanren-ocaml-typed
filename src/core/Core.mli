@@ -390,3 +390,6 @@ module PrunesControl : sig
   val is_exceeded: unit -> bool
   val skipped_prunes : unit -> int
 end
+
+
+val apply_fcpm : (('a,'b) injected as 'v) -> (Env.t -> 'v -> goal) -> goal

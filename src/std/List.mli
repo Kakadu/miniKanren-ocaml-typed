@@ -81,6 +81,11 @@ val reify : (Env.t -> ('a, 'b) injected -> 'b) -> Env.t -> ('a ground, 'b logic)
 val prjc : (Env.t -> ('a, 'b) injected -> 'a) -> (int -> 'a ground GT.list -> 'a ground) ->
   Env.t -> ('a ground, 'b logic) injected -> 'a ground
 
+val cleanup:
+           Env.t ->
+           (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected ->
+           (('a, 'c) Logic.injected, ('b, 'd) Logic.injected) t option
+
 (** Relational foldr *)
 val foldro : (('a, 'b) injected -> ('acc, _ logic' as 'acc2) injected -> ('acc, 'acc2) injected -> goal) -> ('acc, 'acc2) injected -> ('a, 'b) groundi -> ('acc, 'acc2) injected -> goal
 

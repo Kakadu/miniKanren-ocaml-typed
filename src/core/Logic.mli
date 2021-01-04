@@ -150,6 +150,11 @@ module Fmap2 (T : T2) :
      (Env.t -> ('c, 'd) injected -> 'c) ->
      (int -> 'r list -> (('a,'c) T.t as 'r) ) ->
      Env.t -> ('r, ('b,'d) T.t logic) injected -> 'r
+
+  val cleanup: Env.t
+      -> (('a, 'b) T.t, ('c, 'd) T.t logic) injected
+      -> (('a,'c) injected, ('b,'d) injected) T.t option
+
  end
 
 module Fmap3 (T : T3) :

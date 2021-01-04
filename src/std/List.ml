@@ -46,6 +46,8 @@ let rec reify r1 h = F.reify r1 (reify r1) h
 
 let rec prjc fa onvar env xs = F.prjc fa (prjc fa onvar) onvar env xs
 
+let cleanup = F.cleanup
+
 let ground = {
   ground with
   GT.plugins =

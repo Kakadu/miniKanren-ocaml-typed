@@ -160,6 +160,13 @@ module Fmap2 (T : T2) =
       match Env.var env x with
       | Some v -> let i, cs = Term.Var.reify (prjc r1 r2 of_int env) v in of_int i cs
       | None   -> T.fmap (r1 env) (r2 env) x
+
+
+    let rec cleanup env x =
+      match Env.var env x with
+      | Some v -> None
+      | None -> Some (T.fmap Fun.id Fun.id x)
+
   end
 
 module Fmap3 (T : T3) =

@@ -23,6 +23,7 @@ module Stream  = Stream
 module Runconf = Runconf
 module Timer   = Timer
 module Env = Env
+module Pattern0 = Pattern0
 
 module Std =
   struct
