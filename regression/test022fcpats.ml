@@ -68,14 +68,17 @@ end = struct
             k |> fitem  ctx env item  |> ftail ctx env tail)
 end
 
-let rec myinvestigate len (q: M.injected) =
-  apply_fcpm q (fun env q -> Pattern0.parse ListPatterns.(cons __any __) env q (myinvestigate (len+1))
-   ~on_error:(fun () ->
-      apply_fcpm q (fun env q -> Pattern0.parse ListPatterns.nil env q
-        ~on_error:(fun () -> (* got a vairable *) success )
-        (if len mod 2 = 0 then success else failure))
-    )
-  )
+
+let rec myinvestigate len (q: M.injected) : goal =
+  let open ListPatterns in
+  apply_fcpm q
+    Pattern0.(
+        cons __any __ |> map1 ~f:(myinvestigate (len+1))
+      |||
+        (nil |> map0 ~f:(if len mod 2 = 0 then success else failure))
+      ||| (pat_variable |> map0 ~f:success)
+      )
+
 
 let _ =
   runL  10  q  qh (REPR(lists))

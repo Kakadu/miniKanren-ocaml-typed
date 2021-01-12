@@ -63,6 +63,10 @@ include (
 
     let map (T func) ~f = T (fun ctx loc x k -> func ctx loc x (f k))
     let ( >>| ) t f = map t ~f
+
+    let map_result (T func) ~f = T (fun ctx loc x k -> f (func ctx loc x k))
+    let map0 (T func) ~f = T (fun ctx loc x k -> func ctx loc x (           k  f     ))
+    let map1 (T func) ~f = T (fun ctx loc x k -> func ctx loc x (fun a   -> k (f a  )))
   end :
     sig
       type location = Env.t
@@ -92,4 +96,9 @@ include (
 
       val ( >>| ) : ('a, 'b, 'c) t -> ('d -> 'b) -> ('a, 'd, 'c) t
       (** Same as [map] *)
+
+      val map_result : ('a, 'b, 'c) t -> f:('c -> 'd) -> ('a, 'b, 'd) t
+
+      val map0 : ('a, 'b, 'c) t -> f:'v  -> ('a, 'v -> 'b, 'c) t
+      val map1 : ('a, 'v1 ->        'b, 'c) t -> f:('v1 ->        'v) -> ('a, 'v -> 'b, 'c) t
     end )

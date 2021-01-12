@@ -730,5 +730,20 @@ module Tabling =
   end
 
 
-let apply_fcpm : _ -> (Env.t -> _ -> goal) -> goal = fun q f st ->
+let apply_fcpm0 : _ -> (Env.t -> _ -> goal) -> goal = fun q f st ->
   f (State.env st) (Subst.apply (State.env st) (State.subst st) q) st
+
+
+let apply_fcpm q pat : goal = fun st ->
+  Pattern0.parse pat
+    (State.env st)
+    (Subst.apply (State.env st) (State.subst st) q)
+    (fun q -> q st )
+
+
+let pat_variable : ( (_,_) injected, _, _) Pattern0.t =
+  let open Pattern0 in
+  T (fun ctx env (x: (_, _ logic) injected) k ->
+      match Term.var x with
+      | None -> fail env "not a variable"
+      | Some _v -> incr_matched ctx; k)

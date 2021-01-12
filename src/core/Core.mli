@@ -392,4 +392,7 @@ module PrunesControl : sig
 end
 
 
-val apply_fcpm : (('a,'b) injected as 'v) -> (Env.t -> 'v -> goal) -> goal
+val apply_fcpm0 : (('a,'b) injected as 'v) -> (Env.t -> 'v -> goal) -> goal
+val apply_fcpm  : (('a,'b) injected as 'v) -> ('v, goal -> State.t Stream.t, State.t Stream.t) Pattern0.t -> goal
+
+val pat_variable : ( (_, _ logic) Logic.injected, 'c, 'c) Pattern0.t
