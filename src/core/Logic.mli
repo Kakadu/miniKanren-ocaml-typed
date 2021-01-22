@@ -141,7 +141,7 @@ val project : ('a, 'b) reified -> 'a
 (** Building reifiers for a custom type compositionally *)
 
 module Fmap : functor (T : T1) ->
- sig
+sig
    val distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected
 
    val reify : (Env.t -> ('a,'b) injected -> 'b) -> Env.t -> ('a T.t, 'b T.t logic as 'r) injected -> 'r
@@ -149,7 +149,12 @@ module Fmap : functor (T : T1) ->
    val prjc  : (Env.t -> ('a,'b) injected -> 'a) ->
      (int -> 'r list -> ('a T.t as 'r)) ->
      Env.t -> ('r, 'b T.t logic) injected -> 'r
- end
+
+
+  module MakeParser: functor (P: MINI_PARSER_INTERFACE) -> sig
+    val parse : ('a T.t, 'b T.t) injected -> ('a,'b) injected T.t P.t
+  end
+end
 
 module Fmap2 (T : T2) :
 sig
@@ -186,7 +191,7 @@ module Fmap3 (T : T3) :
  end
 
 module Fmap4 (T : T4) :
- sig
+sig
    val distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) T.t ->
                       (('a, 'c, 'e, 'g) T.t, ('b, 'd, 'f, 'h) T.t) injected
 
@@ -199,7 +204,12 @@ module Fmap4 (T : T4) :
      (Env.t -> ('e, 'f) injected -> 'e) -> (Env.t -> ('g, 'h) injected -> 'g) ->
      (int -> 'r list -> 'r) ->
      Env.t -> ('r, ('b,'d,'f,'h) T.t logic) injected -> (('a,'c,'e,'g) T.t as 'r)
- end
+
+  module MakeParser: functor (P: MINI_PARSER_INTERFACE) -> sig
+    val parse : (('a, 'c, 'e, 'g) T.t, ('b, 'd, 'f, 'h) T.t logic) injected
+      -> (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) T.t P.t
+  end
+end
 
 module Fmap5 (T : T5) :
  sig

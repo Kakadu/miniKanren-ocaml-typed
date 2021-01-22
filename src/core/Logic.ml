@@ -192,13 +192,15 @@ module Fmap2 (T : T2) =
 
 
     module MakeParser (P: MINI_PARSER_INTERFACE) = struct
-      let parse : (('a, 'b) T.t, ('c, 'd) T.t) injected -> (('a,'b) injected, ('c, 'd) injected) T.t P.t =
-       fun v ->
-        P.with_state v (fun v env ->
-          match Env.var env v with
-          | Some _ -> P.fail ()
-          | None -> P.return (Obj.magic v)
-        )
+      let parse
+        : (('a, 'b) T.t, ('c, 'd) T.t) injected
+          -> (('a,'b) injected, ('c, 'd) injected) T.t P.t =
+        fun v ->
+          P.with_state v (fun v env ->
+            match Env.var env v with
+            | Some _ -> P.fail ()
+            | None -> P.return (Obj.magic v)
+          )
     end
   end
 
@@ -230,6 +232,19 @@ module Fmap4 (T : T4) = struct
     match Env.var env x with
     | Some v -> let i, cs = Term.Var.reify (prjc r1 r2 r3 r4 of_int env) v in of_int i cs
     | None   -> T.fmap (r1 env) (r2 env) (r3 env) (r4 env) x
+
+
+  module MakeParser (P: MINI_PARSER_INTERFACE) = struct
+    let parse
+      : (('a, 'c, 'e, 'g) T.t, ('b, 'd, 'f, 'h) T.t) injected
+        -> (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) T.t P.t =
+      fun v ->
+        P.with_state v (fun v env ->
+          match Env.var env v with
+          | Some _ -> P.fail ()
+          | None -> P.return (Obj.magic v)
+        )
+  end
 end
 
 module Fmap5 (T : T5) = struct

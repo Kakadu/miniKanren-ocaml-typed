@@ -407,11 +407,12 @@ val apply_fcpm  : (('a,'b) injected as 'v) -> ('v, goal -> State.t Stream.t, Sta
 val pat_variable : ( (_, _ logic) Logic.injected, 'c, 'c) Pattern0.t
 
 
-
 module Parser : sig
   include Logic.MINI_PARSER_INTERFACE
   val (<|>) : 'a t -> 'a t -> 'a t
   val var: (_,_) injected -> unit t
+  val reify: ('v -> Env.t -> 'b) -> (('a, 'b) injected as 'v) -> 'b list t
+  val reify1_exn : ('v -> Env.t -> 'b) -> (('a, 'b) injected as 'v) -> 'b t
 end
 
 val goal_of_parser : goal Parser.t -> goal

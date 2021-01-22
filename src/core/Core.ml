@@ -444,7 +444,16 @@ module Parser = struct
 
   let ( <|> ) l r st = match l st with None -> r st | Some x -> Some x
 
+  let reify reifier v st =
+    return (List.map (fun answ ->
+      reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)
+    ) (State.reify v st)) st
 
+  let reify1_exn reifier v st =
+    match (State.reify v st) with
+    | [] -> fail () st
+    | [answ] -> return (reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)) st
+    | _ -> failwith "reifier1_exn: more than single answer"
 end
 
 let goal_of_parser : goal Parser.t -> goal = fun p st ->
