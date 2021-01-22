@@ -1,6 +1,6 @@
 (*
  * OCanren.
- * Copyright (C) 2015-2017
+ * Copyright (C) 2015-2021
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
  *
@@ -157,6 +157,8 @@ module Prunes : sig
   val recheck : t -> Env.t -> Subst.t -> rez
   val check_last : t -> Env.t -> Subst.t -> rez
   val extend  : t -> Term.VarTbl.key -> ('a, 'b) reifier -> 'b cond -> t
+  val extend2 : t -> (('a, 'b) Logic.injected as 'i) -> ('i, bool -> bool, bool) Pattern0.t -> t
+  val extend3 : t -> 'a -> ('a -> bool) -> t
 end = struct
   type rez = Violated | NonViolated
   type ('a, 'b) reifier = Env.t -> ('a, 'b) Logic.injected -> 'b
@@ -167,36 +169,63 @@ end = struct
   let make_untyped : ('a, 'b) reifier -> 'b cond -> reifier_untyped * cond_untyped =
     fun a b -> Obj.magic (a,b)
 
-  type t = (Obj.t * (reifier_untyped * cond_untyped)) list
+  type constraint_kind =
+    | V1 : Obj.t * (reifier_untyped * cond_untyped) -> constraint_kind
+    | Vfcpm : 'a * ('a, bool -> bool, bool) Pattern0.t -> constraint_kind
+    | V3parser : 'a * ('a -> bool) -> constraint_kind
+
+  type t = constraint_kind list
   let empty = []
 
   exception Fail
 
   let check_last map env subst =
     try
-      let (term, (reifier, checker)) = List.hd map in
-      let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
-      if not (checker reified) then raise Fail;
-      NonViolated
+      match List.hd map with
+      | V1 (term, (reifier, checker)) ->
+        let reified = reifier env (Obj.magic @@ Subst.apply env subst term) in
+        if not (checker reified) then raise Fail;
+        NonViolated
+      | Vfcpm (term, pat) ->
+          if Pattern0.parse pat env
+            (Subst.apply env subst term)
+            Fun.id
+          then NonViolated
+          else Violated
+      | V3parser (v, checker) ->
+        if not (checker @@ Subst.apply env subst v) then raise Fail;
+        NonViolated
     with Not_found -> NonViolated
        | Fail -> Violated
 
-  let recheck ps env s =
+  let recheck ps env subst =
     try
-       ps |> List.iter (fun (k, (reifier, checker)) ->
-          let reified = reifier env (Obj.magic @@ Subst.apply env s k) in
+      ListLabels.iter ps ~f:(function
+        | V1 (k, (reifier, checker)) ->
+          let reified = reifier env (Obj.magic @@ Subst.apply env subst k) in
           if not (checker reified) then raise Fail
-       );
-       NonViolated
+        | Vfcpm (term, pat) ->
+          if Pattern0.parse pat env
+            (Subst.apply env subst term)
+            Fun.id
+          then ()
+          else raise Fail
+        | V3parser (v, checker) ->
+          if not (checker @@ Subst.apply env subst v) then raise Fail
+      );
+      NonViolated
     with Fail -> Violated
 
   let extend map term rr cond =
     let new_item = make_untyped rr cond in
-    (Obj.repr term, new_item) :: map
+    V1 (Obj.repr term, new_item) :: map
 
+  let extend2 map term pat = Vfcpm (term, pat) :: map
+
+  let extend3 map term p = V3parser (term, p) :: map
 end
 
-type prines_control =
+type prunes_control =
   { mutable pc_do_skip : bool
   ; mutable pc_checks_skipped : int
   ; mutable pc_max_to_skip : int
@@ -209,15 +238,12 @@ let prunes_control =
   }
 
 module PrunesControl = struct
-  let enable_skips ~on =
-(*    Printf.printf "enabling skips: %b\n%!" on;*)
-    prunes_control.pc_do_skip <- on
+  let enable_skips ~on = prunes_control.pc_do_skip <- on
   let is_enabled () = prunes_control.pc_do_skip
   let reset_cur_counter () = prunes_control.pc_checks_skipped <- 0
   let reset () =
     reset_cur_counter ();
     prunes_control.pc_skipped_prunes_total <- 0
-
 
   let set_max_skips n =
     assert (n>0);
@@ -242,15 +268,7 @@ module PrunesControl = struct
     ans
     )
 end
-(*
-let do_skip_prunes = ref false
-let prunes_checks_skipped = ref 0
-let max_prunes_skipped = ref 10
 
-let set_skip_prunes_count n =
-  assert (n>0);
-  max_prunes_skipped := n
-*)
 module State =
   struct
     type t =
@@ -296,7 +314,6 @@ module State =
               | Prunes.Violated -> None
               | NonViolated -> Some next_state
             end else begin
-(*              print_endline "check skipped";*)
               let () = PrunesControl.incr () in
               Some next_state
             end
@@ -396,10 +413,70 @@ let debug_var v reifier call = fun st ->
   in
   call xs st
 
+(* ************************************************************************** *)
+module Parser = struct
+  type state = State.t
+
+  module Mini  = struct
+    type 'a t = state -> 'a option
+
+    let fail () _ = None
+    let return x st = Some x
+
+    let with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'r t) -> 'r t =  fun v f st ->
+      f (Obj.magic @@ Subst.reify (State.env st) (State.subst st) v) (State.env st) st
+  end
+
+  include  Mini
+
+  let prim : ('a, 'b) injected -> 'a t =
+    fun var st ->
+    match Env.var (State.env st) var with Some _ -> None | None -> Some (Obj.magic var)
+
+  let var : ('a, 'b) injected -> unit t =
+    fun v st ->
+    match Env.var (State.env st) v with Some _ -> Some () | None -> None
+
+  let bind v f : _ t =
+    fun st -> match v st with None -> None | Some x -> f x st
+
+  let ( >>= ) = bind
+
+  let ( <|> ) l r st = match l st with None -> r st | Some x -> Some x
+
+
+end
+
+let goal_of_parser : goal Parser.t -> goal = fun p st ->
+  match p st with
+  | Some g -> g st
+  | None -> Stream.nil
+
+(* ************************************************************************** *)
+
 
 
 let structural term rr k st =
   let new_constraints = Prunes.extend (State.prunes st) (Obj.magic term) rr k in
+  match Prunes.check_last new_constraints (State.env st) (State.subst st) with
+  | Prunes.Violated -> failure st
+  | NonViolated -> success { st with State.prunes = new_constraints }
+
+let structural_pat term pat st =
+  let new_constraints = Prunes.extend2 (State.prunes st) term pat in
+  match Prunes.check_last new_constraints (State.env st) (State.subst st) with
+  | Prunes.Violated -> failure st
+  | NonViolated -> success { st with State.prunes = new_constraints }
+
+let structural_parser term (parser: _ -> bool Parser.t) : goal = fun st ->
+  let new_constraints =
+    let cond v =
+      match parser v st with
+      | Some b -> b
+      | None -> false
+    in
+    Prunes.extend3 (State.prunes st) term cond
+  in
   match Prunes.check_last new_constraints (State.env st) (State.subst st) with
   | Prunes.Violated -> failure st
   | NonViolated -> success { st with State.prunes = new_constraints }
@@ -740,7 +817,27 @@ let apply_fcpm q pat : goal = fun st ->
     (Subst.apply (State.env st) (State.subst st) q)
     (fun q -> q st )
 
+(*
+let xxx q (pat : (_,bool -> bool,bool) Pattern0.t) : State.t -> bool = fun st ->
+  Pattern0.parse pat
+    (State.env st)
+    (Subst.apply (State.env st) (State.subst st) q)
+    Fun.id
 
+
+let pat_int : ( (int,_) injected, int -> 'r, 'r) Pattern0.t =
+  let open Pattern0 in
+  T (fun ctx env (x: (_, _ logic) injected) k ->
+      match Term.var x with
+      | None -> incr_matched ctx; k (Obj.magic x)
+      | Some _v -> fail env "a variable")
+
+let test_ : (int, _) injected -> bool goal' = fun var ->
+  let ppp : (_,bool -> bool,bool) Pattern0.t = Pattern0.(pat_int |> map1 ~f:(fun n -> n>0)) in
+  xxx var ppp
+
+let structural2: ('a,'b) injected as 'var -> ('var, bool -> 'a, 'a) Pattern0.t -> goal = fun _ _pat -> assert false
+*)
 let pat_variable : ( (_,_) injected, _, _) Pattern0.t =
   let open Pattern0 in
   T (fun ctx env (x: (_, _ logic) injected) k ->

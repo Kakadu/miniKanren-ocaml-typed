@@ -96,6 +96,18 @@ let rec prjc of_int env x =
 
 let project rr = rr#prj
 
+
+module type MINI_PARSER_INTERFACE = sig
+  type 'a t
+
+  val return : 'a -> 'a t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+  val fail : unit -> 'a t
+
+  val with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'r t) -> 'r t
+end
+
+
 module type T1 =
   sig
     type 'a t
@@ -145,6 +157,17 @@ module Fmap (T : T1) =
       match Env.var env x with
       | Some v -> let i, cs = Term.Var.reify (prjc r of_int env) v in of_int i cs
       | None   -> T.fmap (r env) x
+
+
+    module MakeParser (P: MINI_PARSER_INTERFACE) = struct
+      let parse : ('a T.t, 'b T.t) injected -> ('a, 'b) injected T.t P.t =
+       fun v ->
+        P.with_state v (fun v env ->
+          match Env.var env v with
+          | Some _ -> P.fail ()
+          | None -> P.return (Obj.magic v)
+        )
+    end
   end
 
 module Fmap2 (T : T2) =
@@ -167,6 +190,16 @@ module Fmap2 (T : T2) =
       | Some v -> None
       | None -> Some (T.fmap Fun.id Fun.id x)
 
+
+    module MakeParser (P: MINI_PARSER_INTERFACE) = struct
+      let parse : (('a, 'b) T.t, ('c, 'd) T.t) injected -> (('a,'b) injected, ('c, 'd) injected) T.t P.t =
+       fun v ->
+        P.with_state v (fun v env ->
+          match Env.var env v with
+          | Some _ -> P.fail ()
+          | None -> P.return (Obj.magic v)
+        )
+    end
   end
 
 module Fmap3 (T : T3) =

@@ -1,6 +1,6 @@
 (*
  * OCanren.
- * Copyright (C) 2015-2017
+ * Copyright (C) 2015-2021
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
  *
@@ -24,6 +24,7 @@ module Runconf = Runconf
 module Timer   = Timer
 module Env = Env
 module Pattern0 = Pattern0
+module Parser = Parser
 
 module Std =
   struct

@@ -20,6 +20,7 @@
     test020
     test021structural
     test022fcpats
+    test023parsing
   )
   (libraries GT OCanren OCanren.tester)
   (preprocess (action

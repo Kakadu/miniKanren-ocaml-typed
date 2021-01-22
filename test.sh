@@ -61,7 +61,8 @@ fi
 
 
 # compile all tests ahead of time
-dune build `printf "${TESTDIR}/%s.exe " ${TESTS}`
+dune build `printf "${TESTDIR}/%s.exe " ${TESTS}` || exit 1
+
 
 for TEST in ${TESTS}; do
 

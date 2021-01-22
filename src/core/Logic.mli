@@ -82,6 +82,17 @@ end
 
 val make_rr : Env.t -> ('a, 'b) injected -> ('a, 'b) reified
 
+
+module type MINI_PARSER_INTERFACE = sig
+  type 'a t
+
+  val return : 'a -> 'a t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+  val fail : unit -> 'a t
+
+  val with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'r t) -> 'r t
+end
+
 (** Functors (1-6 type parameters) *)
 
 module type T1 =
@@ -141,7 +152,7 @@ module Fmap : functor (T : T1) ->
  end
 
 module Fmap2 (T : T2) :
- sig
+sig
    val distrib : (('a,'c) injected, ('b,'d) injected) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) injected
 
    val reify : (Env.t -> ('a, 'b) injected -> 'b) -> (Env.t -> ('c, 'd) injected -> 'd) -> Env.t -> (('a, 'c) T.t, ('b, 'd) T.t logic as 'r) injected -> 'r
@@ -155,7 +166,10 @@ module Fmap2 (T : T2) :
       -> (('a, 'b) T.t, ('c, 'd) T.t logic) injected
       -> (('a,'c) injected, ('b,'d) injected) T.t option
 
- end
+  module MakeParser: functor (P: MINI_PARSER_INTERFACE) -> sig
+    val parse : (('a, 'b) T.t, ('c, 'd) T.t logic) injected -> (('a,'c) injected, ('b, 'd) injected) T.t P.t
+  end
+end
 
 module Fmap3 (T : T3) :
  sig

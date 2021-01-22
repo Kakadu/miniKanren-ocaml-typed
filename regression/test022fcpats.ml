@@ -92,3 +92,35 @@ let list_of_ones_even_length (q: M.injected) =
 
 let _freeVars =
   runL  10  q  qh (REPR(list_of_ones_even_length))
+
+
+(*
+module StructualTest = struct
+  let even =
+    let rec helper ~iseven (q: M.injected) : bool =
+      apply_fcpm q @@/
+      let open ListPatterns in
+      let open Pattern0 in
+      cons __any __ |> map1 ~f:(helper ~iseven:(not iseven))
+        |||
+      (nil |> map0 ~f:iseven)
+        |||
+      (pat_variable |> map0 ~f:true)
+    in
+    helper ~iseven:true
+
+    (* returns false when constraint is violated *)
+(*     let rec helper ~iseven = function
+    | Var (_,_) -> true  (* list can be any length *)
+    | Value (Std.List.Cons (_, tl)) -> helper ~iseven:(not iseven) tl
+    | Value Nil -> iseven
+    in
+    helper ~iseven:true xs
+    *)
+
+  let list_of_ones_even_length q = (structural_pat q even) &&& (ones q)
+
+  let _freeVars =
+    runL  10  q  qh (REPR(list_of_ones_even_length))
+
+end *)

@@ -133,3 +133,10 @@ val cdro  : ('a, 'b) groundi -> ('a, 'b) groundi -> goal
 
 (** Alias for [cdro] *)
 val tlo   : ('a, 'b) groundi -> ('a, 'b) groundi -> goal
+
+
+
+module Parser : sig
+  val nil : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> unit Core.Parser.t
+  val cons : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> ( ('a, 'c) Logic.injected * ('b, 'd) Logic.injected) Core.Parser.t
+end

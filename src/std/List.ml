@@ -121,6 +121,29 @@ let rec list = function
 | []    -> nil ()
 | x::xs -> cons x (list xs);;
 
+module Parser = struct
+
+  module P = F.MakeParser(Core.Parser)
+  open P
+
+  let nil : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> _ = fun v ->
+    let open Core.Parser in
+    P.parse v >>= function
+    | Nil -> return ()
+    | Cons (_,_) -> fail ()
+
+
+  let cons
+      : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> (('a, 'c) Logic.injected * ('b, 'd) Logic.injected) Core.Parser.t =
+    fun v ->
+      let open Core.Parser in
+      P.parse v >>= function
+      | Nil -> fail ()
+      | Cons (h,tl) -> return (h, tl)
+
+
+end
+
 type ('a,'b) groundi = ('a ground, 'b logic) injected
 
 let (%): ('a,'b) injected -> ('a,'b) groundi -> ('a,'b) groundi = cons
