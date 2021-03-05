@@ -98,13 +98,13 @@ let project rr = rr#prj
 
 
 module type MINI_PARSER_INTERFACE = sig
-  type 'a t
+  type ('a,'e) t
 
-  val return : 'a -> 'a t
-  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
-  val fail : unit -> 'a t
+  val return : 'a -> ('a,'e) t
+  val (>>=) : ('a,'e) t -> ('a -> ('b,'e) t) -> ('b,'e) t
+  val fail : 'e -> (_,'e) t
 
-  val with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'r t) -> 'r t
+  val with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> ('r, 'e) t) -> ('r,'e) t
 end
 
 
@@ -160,7 +160,7 @@ module Fmap (T : T1) =
 
 
     module MakeParser (P: MINI_PARSER_INTERFACE) = struct
-      let parse : ('a T.t, 'b T.t) injected -> ('a, 'b) injected T.t P.t =
+      let parse : ('a T.t, 'b T.t) injected -> (('a, 'b) injected T.t, _) P.t =
        fun v ->
         P.with_state v (fun v env ->
           match Env.var env v with
@@ -194,7 +194,7 @@ module Fmap2 (T : T2) =
     module MakeParser (P: MINI_PARSER_INTERFACE) = struct
       let parse
         : (('a, 'b) T.t, ('c, 'd) T.t) injected
-          -> (('a,'b) injected, ('c, 'd) injected) T.t P.t =
+          -> ( (('a,'b) injected, ('c, 'd) injected) T.t, _) P.t =
         fun v ->
           P.with_state v (fun v env ->
             match Env.var env v with
@@ -237,7 +237,7 @@ module Fmap4 (T : T4) = struct
   module MakeParser (P: MINI_PARSER_INTERFACE) = struct
     let parse
       : (('a, 'c, 'e, 'g) T.t, ('b, 'd, 'f, 'h) T.t) injected
-        -> (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) T.t P.t =
+        -> ( (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) T.t, _) P.t =
       fun v ->
         P.with_state v (fun v env ->
           match Env.var env v with

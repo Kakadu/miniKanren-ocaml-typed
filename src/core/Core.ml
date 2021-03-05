@@ -418,48 +418,78 @@ module Parser = struct
   type state = State.t
 
   module Mini  = struct
-    type 'a t = state -> 'a option
+    type ('a, 'e) t = state -> ('a, 'e) Result.t
 
-    let fail () _ = None
-    let return x st = Some x
+    let fail e _st = Error e
+    let return x _st = Ok x
 
-    let with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'r t) -> 'r t =  fun v f st ->
+    let with_state: ('a, 'b) injected as 'v -> ('v -> Env.t -> 'p) -> (('r, 'e) t as 'p) =  fun v f st ->
       f (Obj.magic @@ Subst.reify (State.env st) (State.subst st) v) (State.env st) st
   end
 
   include  Mini
 
-  let prim : ('a, 'b) injected -> 'a t =
+  let prim : ('a, 'b) injected -> ('a, unit) t =
     fun var st ->
-    match Env.var (State.env st) var with Some _ -> None | None -> Some (Obj.magic var)
+    match Env.var (State.env st) var with Some _ -> Error () | None -> Ok (Obj.magic var)
 
-  let var : ('a, 'b) injected -> unit t =
-    fun v st ->
-    match Env.var (State.env st) v with Some _ -> Some () | None -> None
+  let var = fun v st ->
+    match Env.var (State.env st) v with Some _ -> Ok () | None -> Error ()
 
   let bind v f : _ t =
-    fun st -> match v st with None -> None | Some x -> f x st
+    fun st -> Result.bind (v st) (fun x -> f x st)
+
+  let (>>?) x f st =
+    match x st with
+    | Ok x -> Ok x
+    | Error e -> Error (f e)
 
   let ( >>= ) = bind
 
-  let ( <|> ) l r st = match l st with None -> r st | Some x -> Some x
+  let ( <|> ) l r st = match l st with Error _ -> r st | Ok x -> Ok x
+
+  let recover : ('a, 'e) t -> ('e -> ('a, 'err) t) -> ('a, 'err) t = fun p f st ->
+    match p st with
+    | Ok x -> Ok x
+    | Error e -> f e st
+
 
   let reify reifier v st =
     return (List.map (fun answ ->
-      reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)
+      reifier (Answer.env answ) (Obj.magic @@ Answer.ctr_term answ)
     ) (State.reify v st)) st
 
   let reify1_exn reifier v st =
     match (State.reify v st) with
     | [] -> fail () st
-    | [answ] -> return (reifier (Obj.magic @@ Answer.ctr_term answ) (Answer.env answ)) st
+    | [answ] -> return (reifier (Answer.env answ) (Obj.magic @@ Answer.ctr_term answ)) st
     | _ -> failwith "reifier1_exn: more than single answer"
+
+  let product o1 o2 st =
+    match o1 st with
+    | Error e  -> Error e
+    | Ok x -> match o2 st with
+    | Error e -> Error e
+    | Ok y -> Ok (x,y)
+
+  let map f p st =
+    match p st with
+    | Error e -> Error e
+    | Ok x  -> Ok (f x)
+
+  module Syntax = struct
+    let (let+) x f    = map f x
+    let (and+) o1 o2  = product o1 o2
+    let (let*) x f    = bind x f
+  end
+
+
 end
 
-let goal_of_parser : goal Parser.t -> goal = fun p st ->
+let goal_of_parser = fun p st ->
   match p st with
-  | Some g -> g st
-  | None -> Stream.nil
+  | Ok g -> g st
+  | Error _ -> Stream.nil
 
 (* ************************************************************************** *)
 
@@ -477,12 +507,12 @@ let structural_pat term pat st =
   | Prunes.Violated -> failure st
   | NonViolated -> success { st with State.prunes = new_constraints }
 
-let structural_parser term (parser: _ -> bool Parser.t) : goal = fun st ->
+let structural_parser term parser : goal = fun st ->
   let new_constraints =
     let cond v =
       match parser v st with
-      | Some b -> b
-      | None -> false
+      | Ok b -> b
+      | Error _ -> false
     in
     Prunes.extend3 (State.prunes st) term cond
   in

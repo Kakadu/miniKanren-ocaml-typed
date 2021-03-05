@@ -137,6 +137,17 @@ val tlo   : ('a, 'b) groundi -> ('a, 'b) groundi -> goal
 
 
 module Parser : sig
-  val nil : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> unit Core.Parser.t
-  val cons : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> ( ('a, 'c) Logic.injected * ('b, 'd) Logic.injected) Core.Parser.t
+  val parse : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> ((('a,'c) injected, ('b, 'd) injected) t, unit) Core.Parser.t
+
+  val nil : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> (unit, unit) Core.Parser.t
+  val cons : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> (( ('a, 'c) Logic.injected * ('b, 'd) Logic.injected), unit) Core.Parser.t
+
+  module Std : sig
+    (* val fold_left : ('acc -> 'a -> ('acc, 'e) t) -> ('acc, 'e) t -> 'a logic -> ('acc, 'e) t *)
+
+    val fold_left :
+      ('acc -> 'a -> ('acc, 'e) Core.Parser.t) -> ( ('a, 'b) Logic.injected -> ('a, 'e) Core.Parser.t) ->
+      ('acc, 'e) Core.Parser.t -> ('a,'b) groundi ->
+      ('acc, unit as 'e) Core.Parser.t
+  end
 end

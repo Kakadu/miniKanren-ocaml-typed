@@ -409,15 +409,32 @@ val pat_variable : ( (_, _ logic) Logic.injected, 'c, 'c) Pattern0.t
 
 module Parser : sig
   include Logic.MINI_PARSER_INTERFACE
-  val (<|>) : 'a t -> 'a t -> 'a t
-  val var: (_,_) injected -> unit t
-  val reify: ('v -> Env.t -> 'b) -> (('a, 'b) injected as 'v) -> 'b list t
-  val reify1_exn : ('v -> Env.t -> 'b) -> (('a, 'b) injected as 'v) -> 'b t
+  val (<|>) : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
+  val (>>?) : ('a, 'e) t -> ('e -> 'e2) -> ('a, 'e2) t
+  val var: (_,_) injected -> (unit, unit) t
+  val prim : ('a, 'b) injected -> ('a, unit) t
+
+  val recover : ('a, 'e) t -> ('e -> ('a, 'err) t) -> ('a, 'err) t
+
+  val reify: (Env.t -> 'v -> 'b) -> (('a, 'b) injected as 'v) -> ('b list, unit) t
+  val reify1_exn : (Env.t -> 'v -> 'b) -> (('a, 'b) injected as 'v) -> ('b, unit) t
+
+
+  module Syntax : sig
+    (* Monad *)
+    val ( let* ) : ('a, 'e) t -> ('a -> ('b, 'e) t) -> ('b, 'e) t
+
+    (* Applicatives *)
+    val ( let+ ) : ('a, 'e) t -> ('a -> 'b) -> ('b, 'e) t
+    val ( and+ ) : ('a, 'e) t -> ('b, 'e) t -> ('a * 'b, 'e) t
+  end
+
+
 end
 
-val goal_of_parser : goal Parser.t -> goal
+val goal_of_parser : (goal,_) Parser.t -> goal
 
 val structural_parser :
   ('a,'b) injected as 'v ->
-  ('v -> bool Parser.t) ->
+  ('v -> (bool,_) Parser.t) ->
   goal

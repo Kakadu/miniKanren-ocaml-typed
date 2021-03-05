@@ -1,6 +1,6 @@
 (*
  * OCanren.
- * Copyright (C) 2015-2017
+ * Copyright (C) 2015-2021
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
  *
@@ -55,8 +55,24 @@ module T =
   end
 
 include T
-include Fmap2 (T)
+module F = Fmap2 (T)
 
-let pair x y = Logic.inj @@ distrib (x, y)
+let pair x y = Logic.inj @@ F.distrib (x, y)
 
-let prjc fa fb onvar env xs = prjc fa fb onvar env xs
+let prjc fa fb onvar env xs = F.prjc fa fb onvar env xs
+
+let reify = F.reify
+
+module Parser = struct
+  module P = F.MakeParser(Core.Parser)
+
+  let parse = P.parse
+
+  open Core.Parser
+
+  let pair v = parse v
+
+  (* let pair_ fl fr v =
+    pair v >>= fun (l,r) -> fl l >>= fun l -> fr r >>= fun r -> return (l,r)
+ *)
+end

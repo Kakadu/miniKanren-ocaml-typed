@@ -1,6 +1,6 @@
 (*
  * OCanren.
- * Copyright (C) 2015-2020
+ * Copyright (C) 2015-2021
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
  *
@@ -54,3 +54,15 @@ val prjc :
   (Env.t -> ('c, 'd) injected -> 'c) ->
   (int -> ('a,'c) ground GT.list -> ('a, 'c) ground) ->
   Env.t -> ( ('a,'c) ground, ('b, 'd) logic) injected -> ('a, 'c) ground
+
+
+module Parser : sig
+  val parse : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> ((('a,'c) injected, ('b, 'd) injected) t, unit) Core.Parser.t
+
+  val pair : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> ((('a,'c) injected, ('b, 'd) injected) t, unit) Core.Parser.t
+
+  (* val pair_: (('a, 'c) injected -> ('l, 'e) Core.Parser.t) ->
+    (('b, 'd) injected -> ('r, 'e) Core.Parser.t) ->
+    (('a, 'b) t, ('c, 'd) t Logic.logic) injected ->
+    ( 'l * 'r, unit) Core.Parser.t *)
+end

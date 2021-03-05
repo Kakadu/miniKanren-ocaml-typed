@@ -122,9 +122,10 @@ let rec list = function
 | x::xs -> cons x (list xs);;
 
 module Parser = struct
-
   module P = F.MakeParser(Core.Parser)
   open P
+
+  let parse = P.parse
 
   let nil : (('a, 'b) t, ('c, 'd) t Logic.logic) Logic.injected -> _ = fun v ->
     let open Core.Parser in
@@ -134,14 +135,27 @@ module Parser = struct
 
 
   let cons
-      : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> (('a, 'c) Logic.injected * ('b, 'd) Logic.injected) Core.Parser.t =
+      : (('a, 'b) t, ('c, 'd) t Logic.logic) injected -> ((('a, 'c) Logic.injected * ('b, 'd) Logic.injected), unit) Core.Parser.t =
     fun v ->
       let open Core.Parser in
       P.parse v >>= function
       | Nil -> fail ()
       | Cons (h,tl) -> return (h, tl)
 
+  open Core.Parser
+  module Std = struct
+    (* let rec fold_left f init xs =
+      match xs with
+      | Nil -> init
+      | Cons (h, tl) -> init >>= fun acc -> fold_left f (f acc h ) tl *)
 
+
+    let rec fold_left f ph acc v =
+      P.parse v >>= function
+      | Nil -> acc
+      | Cons (h,tl) ->
+        ph h >>= fun h -> acc >>= fun acc -> fold_left f ph (f acc h) tl
+  end
 end
 
 type ('a,'b) groundi = ('a ground, 'b logic) injected

@@ -24,7 +24,10 @@ module Runconf = Runconf
 module Timer   = Timer
 module Env = Env
 module Pattern0 = Pattern0
-module Parser = Parser
+module Parser = struct
+  include Parser
+  module List = List.Parser.Std
+end
 
 module Std =
   struct
