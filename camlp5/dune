@@ -11,7 +11,7 @@
  (deps pa_ocanren.cmxa)
  (action
   (run mkcamlp5.opt -package
-    camlp5,camlp5.pa_o,camlp5.macro,camlp5.pr_dump,GT-p5,GT.syntax.all
+    camlp5,camlp5.pa_o,camlp5.macro,camlp5.pr_dump,GT-p5,GT.syntax.all %{read-lines:../config/extra_doc.txt}
     %{deps} -o %{targets})))
 
 (rule
@@ -20,7 +20,7 @@
  (action
   ; add `-package pa_ppx.dock` below to build documentation
   (run mkcamlp5 -package
-    camlp5,camlp5.pa_o,camlp5.macro,camlp5.pr_dump,GT-p5,GT.syntax.all
+    camlp5,camlp5.pa_o,camlp5.macro,camlp5.pr_dump,GT-p5,GT.syntax.all %{read-lines:../config/extra_doc.txt}
     %{deps} -o %{targets})))
 
 (rule

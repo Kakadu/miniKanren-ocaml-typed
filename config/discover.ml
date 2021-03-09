@@ -126,6 +126,22 @@ let gen_tests_dune _ tests =
   let outchn = open_out dune_fn in
   output_string outchn dune
 
+let discover_in_env () =
+  let () =
+    Cfg.Flags.write_lines "extra_doc.txt"
+    (try let _ = Sys.getenv "OCANREN_USE_DOC" in
+      ["-package"; "pa_ppx.dock"]
+    with Not_found -> [])
+  in
+  let () =
+    Cfg.Flags.write_lines "peep_options.txt"
+    (try let _ = Sys.getenv "OCANREN_STATS" in
+      ["-D"; "STATS"]
+    with Not_found -> [])
+  in
+  ()
+
+
 (*** command line arguments ***)
 
 let tests         = ref false
@@ -162,6 +178,9 @@ let () =
         | None     -> failwith "-tests-dir argument is not set"
       else []
     in
+
+    discover_in_env ();
+
 
     if !tests || !all then
       discover_tests cfg testnames ;

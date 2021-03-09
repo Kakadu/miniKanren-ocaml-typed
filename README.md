@@ -21,6 +21,8 @@
   - [Building the syntax extensions](#building-the-syntax-extensions)
   - [Building and running tests](#building-and-running-tests)
   - [Building and running samples](#building-and-running-samples)
+  - [Building documentation](#building-documentation)
+  - [Building with instrumentalization](#building-with-instrumentalization)
 - [More info](#more-info)
 
 # Introduction
@@ -493,11 +495,17 @@ Also, the output of the sample can be compared to the expected one (and promoted
 
 Starting from version 8 Camlp5 requries extra library `pa_ppx.doc` to build documentation. To get it you need
 
-* install this library: `opam install pa_ppx`
-* add `-package pa_ppx.dock` in two places in the file `/camlp5/dune`. Without it all the documentation in files, preprocessed by camlp5 will be omitted.
+* install the library: `opam install pa_ppx`
+* set environment variable `OCANREN_USE_DOC` and run compilations. The right options for documentation will be discovered and substituted (see `config/discover.ml` for details).
+* Alternatives, you can add `-package pa_ppx.dock` in right places in the file `/camlp5/dune`.
 * run `dune build @doc`
 * open `_build/default/_doc/_html/index.html`
 
+The documentation setting will be saved until `dune clean` (or more precisely until rebuilding of the file `_build/default/config/extra_doc.txt`)
+
+## Building with instrumentalization
+
+Module `src/core/Peep.mli` allow counting of various micro operations that are being performed. (**Caution**: It sireously reduces performance.). To enable it set enveiroment variable `OCANREN_STATS`. Do a full clean to disable it.
 
 # More info
 
